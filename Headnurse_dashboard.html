@@ -339,7 +339,7 @@
 
 <script>
     // ตรวจสอบ Base URL ของ API
-    const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'https://autoshift-backend.onrender.com';
+    const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'ลิงก์ Back-end';
     
     // --- [จุดที่ 1: ต้องมีตัวแปรเก็บข้อมูลแยกประเภทวัน] ---
     let currentDayType = 'weekday'; 
@@ -698,7 +698,75 @@
 }
 
     async function openPasswordModal() {
-        // --- ส่วน Password Modal ของคุณทำงานได้ดีอยู่แล้ว สามารถคงเดิมไว้ได้เลยครับ ---
+        const { value: formValues } = await Swal.fire({
+            title: 'เปลี่ยนรหัสผ่านใหม่',
+            html: `
+                <div class="text-left space-y-3 p-2">
+                    <div class="swal-input-container">
+                        <input id="swal-old-pass" type="password" class="swal2-input !m-0 w-full" placeholder="รหัสผ่านปัจจุบัน">
+                        <i class="fas fa-eye swal-eye-icon" onclick="toggleSwalPass('swal-old-pass', this)"></i>
+                    </div>
+                    <div class="swal-input-container">
+                        <input id="swal-new-pass" type="password" class="swal2-input !m-0 w-full" placeholder="รหัสผ่านใหม่">
+                        <i class="fas fa-eye swal-eye-icon" onclick="toggleSwalPass('swal-new-pass', this)"></i>
+                    </div>
+                    <div class="swal-input-container">
+                        <input id="swal-confirm-pass" type="password" class="swal2-input !m-0 w-full" placeholder="ยืนยันรหัสผ่านใหม่">
+                        <i class="fas fa-eye swal-eye-icon" onclick="toggleSwalPass('swal-confirm-pass', this)"></i>
+                    </div>
+                    <div class="validation-box mt-4">
+                        <ul>
+                            <li id="m-req-length" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> อย่างน้อย 8 ตัวอักษร</li>
+                            <li id="m-req-match" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> รหัสผ่านตรงกัน</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'บันทึกการเปลี่ยน',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#7c3aed',
+            didOpen: () => {
+                const newPass = document.getElementById('swal-new-pass');
+                const confPass = document.getElementById('swal-confirm-pass');
+                
+                // ตรวจสอบเงื่อนไขแบบ Real-time
+                const validate = () => {
+                    const isLengthOk = newPass.value.length >= 8;
+                    const isMatch = newPass.value === confPass.value && newPass.value !== "";
+
+                    document.getElementById('m-req-length').className = isLengthOk ? 'm-req-item valid' : 'm-req-item';
+                    document.getElementById('m-req-match').className = isMatch ? 'm-req-item valid' : 'm-req-item';
+                };
+
+                newPass.addEventListener('input', validate);
+                confPass.addEventListener('input', validate);
+            },
+            preConfirm: () => {
+                const oldPass = document.getElementById('swal-old-pass').value;
+                const newPass = document.getElementById('swal-new-pass').value;
+                const confPass = document.getElementById('swal-confirm-pass').value;
+
+                if (!oldPass || !newPass || !confPass) {
+                    Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+                    return false;
+                }
+                if (newPass.length < 8) {
+                    Swal.showValidationMessage('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร');
+                    return false;
+                }
+                if (newPass !== confPass) {
+                    Swal.showValidationMessage('รหัสผ่านใหม่ไม่ตรงกัน');
+                    return false;
+                }
+                return { oldPassword: oldPass, newPassword: newPass };
+            }
+        });
+
+        if (formValues) {
+            savePasswordToDB(formValues);
+        }
     }
 
     async function savePasswordToDB(payload) {
