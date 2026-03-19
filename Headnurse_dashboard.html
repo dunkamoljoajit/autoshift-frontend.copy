@@ -717,7 +717,8 @@
                     <div class="validation-box mt-4">
                         <ul>
                             <li id="m-req-length" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> อย่างน้อย 8 ตัวอักษร</li>
-                            <li id="m-req-match" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> รหัสผ่านตรงกัน</li>
+                            <li id="m-req-match" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> รหัสผ่านใหม่ตรงกัน</li>
+                            <li id="m-req-diff" class="m-req-item"><i class="fas fa-circle text-[8px]"></i> ต้องไม่ซ้ำกับรหัสผ่านเดิม</li>
                         </ul>
                     </div>
                 </div>
@@ -728,26 +729,35 @@
             cancelButtonText: 'ยกเลิก',
             confirmButtonColor: '#7c3aed',
             didOpen: () => {
+                const oldPass = document.getElementById('swal-old-pass');
                 const newPass = document.getElementById('swal-new-pass');
                 const confPass = document.getElementById('swal-confirm-pass');
                 
-                // ตรวจสอบเงื่อนไขแบบ Real-time
                 const validate = () => {
                     const isLengthOk = newPass.value.length >= 8;
                     const isMatch = newPass.value === confPass.value && newPass.value !== "";
-
+                    // เงื่อนไข: รหัสใหม่ต้องไม่ตรงกับรหัสเก่า (ตรวจสอบเมื่อมีการกรอกทั้งคู่)
+                    const isDifferent = newPass.value !== oldPass.value || newPass.value === "";
+    
                     document.getElementById('m-req-length').className = isLengthOk ? 'm-req-item valid' : 'm-req-item';
                     document.getElementById('m-req-match').className = isMatch ? 'm-req-item valid' : 'm-req-item';
+                    document.getElementById('m-req-diff').className = (isDifferent && newPass.value !== "") ? 'm-req-item valid' : 'm-req-item';
+                    
+                    // ถ้าซ้ำรหัสเดิม ให้แสดงสีแดงเตือน (Optional)
+                    if (newPass.value !== "" && oldPass.value !== "" && newPass.value === oldPass.value) {
+                        document.getElementById('m-req-diff').style.color = '#ef4444'; 
+                    } else {
+                        document.getElementById('m-req-diff').style.color = '';
+                    }
                 };
-
-                newPass.addEventListener('input', validate);
-                confPass.addEventListener('input', validate);
+    
+                [oldPass, newPass, confPass].forEach(el => el.addEventListener('input', validate));
             },
             preConfirm: () => {
                 const oldPass = document.getElementById('swal-old-pass').value;
                 const newPass = document.getElementById('swal-new-pass').value;
                 const confPass = document.getElementById('swal-confirm-pass').value;
-
+    
                 if (!oldPass || !newPass || !confPass) {
                     Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบทุกช่อง');
                     return false;
@@ -760,29 +770,62 @@
                     Swal.showValidationMessage('รหัสผ่านใหม่ไม่ตรงกัน');
                     return false;
                 }
+                if (newPass === oldPass) {
+                    Swal.showValidationMessage('รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม');
+                    return false;
+                }
                 return { oldPassword: oldPass, newPassword: newPass };
             }
         });
-
+    
         if (formValues) {
             savePasswordToDB(formValues);
         }
     }
 
     async function savePasswordToDB(payload) {
-        Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        Swal.fire({ 
+            title: 'กำลังตรวจสอบข้อมูล...', 
+            allowOutsideClick: false, 
+            didOpen: () => { Swal.showLoading(); } 
+        });
+    
         try {
             const res = await fetch(`${API_URL}/api/change-password`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({ ...payload, currentSocketId: window.socket ? window.socket.id : null })
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}` 
+                },
+                body: JSON.stringify({ 
+                    ...payload, 
+                    currentSocketId: window.socket ? window.socket.id : null 
+                })
             });
+    
             const data = await res.json();
+    
             if (data.success) {
                 if (data.token) localStorage.setItem('token', data.token);
-                await Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ!', timer: 2500 });
-            } else { throw new Error(data.message); }
-        } catch (err) { Swal.fire({ icon: 'error', title: 'ล้มเหลว', text: err.message }); }
+                await Swal.fire({ 
+                    icon: 'success', 
+                    title: 'เปลี่ยนรหัสผ่านสำเร็จ!', 
+                    text: 'ระบบได้อัปเดตรหัสผ่านใหม่เรียบร้อยแล้ว',
+                    timer: 2500 
+                });
+            } else {
+                // --- จุดสำคัญ: ถ้า Server บอกว่ารหัสเดิมผิด (เช่น data.message = "รหัสผ่านเดิมไม่ถูกต้อง") ---
+                throw new Error(data.message || 'รหัสผ่านเดิมไม่ถูกต้อง');
+            }
+        } catch (err) {
+            // แสดง Error สีแดงเพื่อให้ผู้ใช้รู้ว่ารหัสเดิมผิด หรือเกิดปัญหาอื่นๆ
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'ไม่สามารถเปลี่ยนรหัสผ่านได้', 
+                text: err.message === 'Failed to fetch' ? 'ติดต่อ Server ไม่ได้' : err.message,
+                confirmButtonColor: '#ef4444'
+            });
+        }
     }
 
     function checkHeadNurseRole() {
