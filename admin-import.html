@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>จัดการข้อมูลบุคลากร - Admin</title>
+    
+    <link href="./style.css" rel="stylesheet"> 
+    <script src="https://autoshift-backend.onrender.com/socket.io/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <script src="components.js"></script> 
+
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #f0fdfa; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased" style="background-image: url('background06.png'); background-size: cover; background-attachment: fixed;">
+
+    <div class="flex flex-col min-h-screen">
+        <app-header></app-header>
+
+        <main class="flex-1 w-full max-w-4xl mx-auto p-4 md:p-6 pb-32 animate-fade-in">
+            
+            <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-center sm:text-left">
+                    <h1 class="text-2xl font-bold text-slate-800">จัดการข้อมูลบุคลากร</h1>
+                    <p class="text-slate-500 text-sm">เพิ่มผู้ใช้ใหม่เข้าสู่ระบบ (Excel หรือ รายบุคคล)</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <a href="template_users.xlsx" download class="hidden sm:flex items-center text-indigo-600 text-sm hover:underline bg-white px-4 py-2 rounded-lg shadow-sm border border-indigo-100 transition hover:bg-indigo-50">
+                        <i class="fas fa-file-download mr-2"></i> ไฟล์ตัวอย่าง
+                    </a>
+                    
+                    <button onclick="openAddModal()" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm rounded-xl shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5 transition-all flex items-center font-medium">
+                        <i class="fas fa-user-plus mr-2"></i> เพิ่มรายคน
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg border border-indigo-100 p-8 text-center">
+                <div id="drop-zone" class="border-3 border-dashed border-indigo-200 rounded-2xl p-10 bg-indigo-50/50 hover:bg-indigo-50 transition-colors cursor-pointer group relative">
+                    <input type="file" id="fileInput" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    
+                    <div class="flex flex-col items-center justify-center space-y-4 pointer-events-none">
+                        <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
+                            <i class="fas fa-file-excel text-3xl text-green-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-lg font-bold text-slate-700 group-hover:text-indigo-600 transition">คลิกเพื่อเลือกไฟล์ Excel</p>
+                            <p class="text-sm text-slate-400">หรือลากไฟล์มาวางที่นี่ (.xlsx เท่านั้น)</p>
+                        </div>
+                        <p id="fileNameDisplay" class="text-indigo-600 font-medium text-sm hidden bg-indigo-100 px-3 py-1 rounded-full"></p>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-center gap-4">
+                    <button onclick="uploadFile()" class="px-8 py-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-slate-700 hover:-translate-y-1 transition-all font-bold flex items-center">
+                        <i class="fas fa-cloud-upload-alt mr-2"></i> เริ่มนำเข้าข้อมูล
+                    </button>
+                </div>
+            </div>
+
+            <div id="result-area" class="hidden mt-8 animate-fade-in">
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-slate-800">ผลการนำเข้าข้อมูล</h3>
+                        <span id="timestamp-display" class="text-xs text-slate-400"></span>
+                    </div>
+                    
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                            <p class="text-sm text-blue-600 mb-1">ทั้งหมด</p>
+                            <p id="stat-total" class="text-3xl font-bold text-blue-800">0</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded-2xl border border-green-100">
+                            <p class="text-sm text-green-600 mb-1">สำเร็จ</p>
+                            <p id="stat-success" class="text-3xl font-bold text-green-800">0</p>
+                        </div>
+                        <div class="p-4 bg-red-50 rounded-2xl border border-red-100">
+                            <p class="text-sm text-red-600 mb-1">ล้มเหลว</p>
+                            <p id="stat-failed" class="text-3xl font-bold text-red-800">0</p>
+                        </div>
+                    </div>
+
+                    <div id="error-list-container" class="hidden">
+                        <div class="px-6 pb-2">
+                            <p class="text-sm font-bold text-red-500 mb-2"><i class="fas fa-exclamation-circle mr-1"></i> รายการที่พบปัญหา:</p>
+                        </div>
+                        <div class="max-h-60 overflow-y-auto bg-slate-50 border-t border-slate-100">
+                            <ul id="error-list" class="divide-y divide-slate-200 text-sm text-slate-600"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <app-navbar></app-navbar>
+    </div>
+
+    <div id="addUserModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onclick="closeAddModal()"></div>
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-white/20">
+                    <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-4 sm:px-6 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-white flex items-center"><i class="fas fa-user-plus mr-2"></i>เพิ่มพยาบาลใหม่</h3>
+                        <button onclick="closeAddModal()" class="text-white/70 hover:text-white transition"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                    <div class="px-6 py-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">อีเมล (ใช้สำหรับ Login) <span class="text-red-500">*</span></label>
+                            <input type="email" id="input-email" class="block w-full rounded-xl border-slate-200 bg-slate-50 border p-2.5" placeholder="nurse@example.com">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">ชื่อจริง <span class="text-red-500">*</span></label>
+                                <input type="text" id="input-firstname" class="block w-full rounded-xl border-slate-200 bg-slate-50 border p-2.5" placeholder="สมหญิง">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">นามสกุล</label>
+                                <input type="text" id="input-lastname" class="block w-full rounded-xl border-slate-200 bg-slate-50 border p-2.5" placeholder="ใจดี">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">ตำแหน่ง</label>
+                            <select id="input-role" class="block w-full rounded-xl border-slate-200 bg-slate-50 border p-2.5">
+                                <option value="2">พยาบาลวิชาชีพ (Nurse)</option>
+                                <option value="1">หัวหน้าพยาบาล (Admin)</option>
+                            </select>
+                        </div>
+                        <div class="bg-amber-50 p-3 rounded-lg text-xs text-amber-800 border border-amber-200 flex items-start gap-2">
+                            <i class="fas fa-info-circle mt-0.5 text-amber-500"></i>
+                            <span>ระบบจะสร้างรหัสผ่านสุ่มอัตโนมัติ และส่งไปยังอีเมลของผู้ใช้งานทันทีที่กดบันทึก</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-slate-100">
+                        <button type="button" onclick="submitSingleUser()" class="inline-flex w-full justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto transition-all">บันทึกข้อมูล</button>
+                        <button type="button" onclick="closeAddModal()" class="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto transition">ยกเลิก</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   <script>
+    // Check User Role & API Base
+    document.addEventListener('DOMContentLoaded', () => {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) { window.location.href = 'index.html'; return; }
+        const user = JSON.parse(userStr);
+        if (user.RoleID !== 1) {
+            Swal.fire({ icon: 'error', title: 'ไม่มีสิทธิ์เข้าถึง', showConfirmButton: false, timer: 2000 }).then(() => {
+                window.location.href = 'dashboard.html';
+            });
+        }
+    });
+
+    // ----------------------------------------
+    // ฟังก์ชัน Upload Excel
+    // ----------------------------------------
+    const fileInput = document.getElementById('fileInput');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const dropZone = document.getElementById('drop-zone');
+
+    fileInput.addEventListener('change', (e) => {
+        if(e.target.files.length > 0) {
+            fileNameDisplay.textContent = `ไฟล์ที่เลือก: ${e.target.files[0].name}`;
+            fileNameDisplay.classList.remove('hidden');
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-100');
+        }
+    });
+
+    async function uploadFile() {
+        const files = fileInput.files;
+        if (files.length === 0) { 
+            return Swal.fire({ icon: 'warning', title: 'แจ้งเตือน', text: 'กรุณาเลือกไฟล์ Excel ก่อนครับ' }); 
+        }
+
+        const formData = new FormData();
+        formData.append('file', files[0]);
+
+        Swal.fire({ 
+            title: 'กำลังประมวลผล...', 
+            text: 'ระบบกำลังนำเข้าข้อมูลพยาบาล โปรดรอสักครู่',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading() 
+        });
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            // ✅ ใช้ API_BASE จาก components.js และ Backtick (`) เพื่อป้องกัน Error 404
+            const res = await fetch(`${API_BASE}/api/admin/import-users`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                Swal.close();
+                displayResult(data); // เรียกโชว์สถิติด้านล่าง
+                
+                Swal.fire({ 
+                    icon: 'success', 
+                    title: 'สำเร็จ', 
+                    text: data.message || 'นำเข้าข้อมูลเรียบร้อยแล้ว', 
+                    timer: 3000 
+                });
+
+                // ล้างค่าไฟล์หลังสำเร็จ
+                fileInput.value = '';
+                fileNameDisplay.classList.add('hidden');
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-100');
+
+            } else { 
+                throw new Error(data.message || 'เกิดข้อผิดพลาดในการนำเข้า'); 
+            }
+        } catch (err) {
+            console.error("Upload Error:", err);
+            Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
+        }
+    }
+
+    function displayResult(data) {
+        const area = document.getElementById('result-area');
+        if (!area) return;
+
+        // --- ส่วนคำนวณสถิติแบบดึงเลขจากข้อความ ---
+        let successCount = 0;
+        if (data.message) {
+            // ดึงตัวเลขแรกที่เจอในข้อความ "นำเข้าสำเร็จ X ท่าน"
+            const match = data.message.match(/\d+/);
+            successCount = match ? parseInt(match[0]) : 0;
+        }
+
+        // นับจำนวนรายการที่ล้มเหลวจาก array errors
+        const errorCount = (data.errors && Array.isArray(data.errors)) ? data.errors.length : 0;
+        const totalCount = successCount + errorCount;
+
+        // อัปเดตตัวเลขเข้า UI
+        document.getElementById('stat-total').innerText = totalCount;
+        document.getElementById('stat-success').innerText = successCount;
+        document.getElementById('stat-failed').innerText = errorCount;
+        document.getElementById('timestamp-display').innerText = `ล่าสุดเมื่อ: ${new Date().toLocaleTimeString('th-TH')} น.`;
+
+        const list = document.getElementById('error-list');
+        const errorContainer = document.getElementById('error-list-container');
+        
+        list.innerHTML = '';
+        if (errorCount > 0) {
+            errorContainer.classList.remove('hidden');
+            data.errors.forEach(err => {
+                list.innerHTML += `
+                    <li class="px-6 py-3 hover:bg-red-50 flex items-start gap-2 text-red-600">
+                        <i class="fas fa-times-circle mt-0.5"></i> 
+                        <span>${err}</span>
+                    </li>`;
+            });
+        } else { 
+            errorContainer.classList.add('hidden'); 
+        }
+
+        area.classList.remove('hidden');
+        area.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ----------------------------------------
+    // ฟังก์ชัน Manual Add User
+    // ----------------------------------------
+    const modal = document.getElementById('addUserModal');
+    function openAddModal() { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+    function closeAddModal() { 
+        modal.classList.add('hidden'); modal.classList.remove('flex'); 
+        document.getElementById('input-email').value = '';
+        document.getElementById('input-firstname').value = '';
+        document.getElementById('input-lastname').value = '';
+    }
+
+    async function submitSingleUser() {
+        const email = document.getElementById('input-email').value.trim();
+        const firstName = document.getElementById('input-firstname').value.trim();
+        const lastName = document.getElementById('input-lastname').value.trim();
+        const roleId = document.getElementById('input-role').value;
+
+        if (!email || !firstName) { return Swal.fire('ข้อมูลไม่ครบ', 'กรุณากรอกอีเมลและชื่อจริง', 'warning'); }
+
+        Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/admin/add-user`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ email, firstName, lastName, roleId })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                closeAddModal();
+                Swal.fire({ icon: 'success', title: 'สำเร็จ', html: `เพิ่มคุณ <b>${firstName}</b> เรียบร้อย`, timer: 3000 });
+            } else { 
+                throw new Error(data.message || 'บันทึกข้อมูลไม่สำเร็จ'); 
+            }
+        } catch (err) {
+            console.error("Add User Error:", err);
+            Swal.fire('เกิดข้อผิดพลาด', err.message, 'error');
+        }
+    }
+</script>
+</body>
+</html>

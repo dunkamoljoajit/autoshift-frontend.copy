@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ตารางเวรส่วนตัว - AUTONURSESHIFT</title>
+    
+    <link href="./style.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="./lib/flatpickr.css">
+    <script src="./lib/flatpickr.js"></script>
+    <script src="./lib/th.js"></script>
+
+    <link rel="stylesheet" href="./lib/fontawesome/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script> 
+
+    <style>
+        /* --- CORE THEME --- */
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f0f4f8;
+            background-image: url('background06.png'); 
+            background-size: cover; 
+            background-position: center;
+            background-attachment: fixed;
+            -webkit-tap-highlight-color: transparent; 
+            color: #1e293b;
+            overscroll-behavior: none;
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 6rem); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* --- GLASSMORPHISM --- */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+        .glass-modal {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        /* --- CALENDAR STYLES --- */
+        .day-cell {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-radius: 18px;
+        }
+        .day-cell.today {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        .day-cell.today .dot { background-color: #fff !important; opacity: 0.9; }
+        .day-cell.has-shift:not(.today):hover { 
+            background-color: rgba(255,255,255,0.9); box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        }
+
+        /* สไตล์สำหรับแถบชื่อเวร (Shift Bar) */
+        .shift-bar {
+            width: 95%;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 6px;
+            margin-top: 2px;
+            border-radius: 6px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: white;
+            line-height: 1.2;
+        }
+
+        /* สีสำหรับแต่ละเวร */
+        .bar-morning { background: linear-gradient(90deg, #3b82f6, #60a5fa); box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
+        .bar-afternoon { background: linear-gradient(90deg, #f97316, #fb923c); box-shadow: 0 2px 4px rgba(249, 115, 22, 0.2); }
+        .bar-night { background: linear-gradient(90deg, #a855f7, #c084fc); box-shadow: 0 2px 4px rgba(168, 85, 247, 0.2); }
+
+        /* ปรับปรุงขนาดของ day-cell ให้รองรับแถบสี */
+        .day-cell {
+            height: auto !important;
+            min-height: 4.5rem; /* เพิ่มความสูงขึ้นเล็กน้อย */
+            padding: 4px 0;
+            justify-content: flex-start !important; /* ให้วันที่อยู่ด้านบน */
+        }
+
+        .day-cell span.date-number {
+            margin-bottom: 2px;
+            font-size: 13px;
+        }
+        /* ไฮไลต์ชื่อวันหยุด */
+        .holiday-name {
+            font-size: 10px;        /* ⬆️ ปรับจาก 8px เป็น 10px */
+            color: #dc2626;        /* ใช้สีแดงที่เข้มขึ้นเล็กน้อยเพื่อให้ตัดกับพื้นหลัง */
+            font-weight: 700;
+            margin-top: 2px;
+            width: 100%;           /* ขยายให้เต็มพื้นที่ Cell */
+            text-align: center;
+            line-height: 1.1;      /* ปรับระยะห่างระหว่างบรรทัด */
+            
+            /* กรณีชื่อยาวเกินไป ให้แสดง 2 บรรทัดแทนการตัดคำทิ้ง */
+            white-space: normal;    /* 🔄 เปลี่ยนจาก nowrap เป็น normal */
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* แสดงสูงสุด 2 บรรทัด */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* ปรับสีตัวเลขวันที่ของวันหยุด */
+        .day-cell.is-holiday .date-number {
+            font-size: 16px;       /* ⬆️ ถ้าอยากให้เลขวันที่ใหญ่ขึ้นด้วย */
+            color: #ef4444 !important;
+            font-weight: 800;      /* เน้นตัวหนาเป็นพิเศษ */
+        }
+
+        /* พื้นหลังจางๆ สำหรับวันหยุด */
+        .day-cell.is-holiday {
+            background-color: rgba(254, 226, 226, 0.6); /* ⬆️ เพิ่มความเข้มพื้นหลังเล็กน้อย */
+            border: 1px solid rgba(239, 68, 68, 0.2);   /* เพิ่มเส้นขอบแดงจางๆ ให้ดูเป็นระเบียบ */
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        .animate-pop { opacity: 0; animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        /* ขยายขนาดการ์ดใน Modal ให้ใหญ่ขึ้น */
+        .shift-card-large {
+            padding: 1.5rem !important; /* เพิ่มพื้นที่ว่างด้านใน */
+            margin-bottom: 1.25rem !important;
+            border-radius: 2rem !important;
+        }
+
+        /* ปรับขนาดตัวเลขเวลาให้ใหญ่เด่นชัด */
+        .time-display-large {
+            font-size: 1.75rem !important; /* ขนาดประมาณ 28px */
+            letter-spacing: -0.02em;
+        }
+
+        /* ปรับขนาดปุ่มกดให้กดง่ายขึ้น (เหมาะกับนิ้วมือ) */
+        .action-btn-large {
+            padding: 0.75rem 1.25rem !important;
+            font-size: 0.9rem !important;
+            min-width: 80px;
+        }
+        @media (min-width: 768px) {
+            .glass-panel {
+                max-width: 90% !important; /* ขยายความกว้างเล็กน้อยเพื่อให้แถบสีมีพื้นที่แสดงชื่อเวร */
+                margin: 0 auto;
+                padding: 1.5rem !important; 
+            }
+
+            /* ปรับขนาดช่องวันที่ให้รองรับแถบสีหลายอัน */
+            .day-cell {
+                height: auto !important; /* ให้ยืดหยุ่นตามจำนวนเวร */
+                min-height: 6rem !important; /* กำหนดค่าเริ่มต้นให้ดูสมดุล */
+                border-radius: 20px !important;
+                padding: 8px 4px !important;
+            }
+
+            .day-cell span.date-number {
+                font-size: 1.2rem !important;
+                margin-bottom: 4px;
+            }
+
+            /* ปรับขนาดตัวอักษรในแถบสีให้ใหญ่ขึ้นเล็กน้อยเมื่ออยู่บนหน้าจอใหญ่ */
+            .shift-bar {
+                font-size: 10px !important;
+                padding: 3px 8px !important;
+                border-radius: 8px !important;
+                width: 90% !important;
+            }
+
+            /* ซ่อนจุด (ถ้ายังมีค้างอยู่ในโค้ดเก่า) */
+            .dot {
+                display: none !important;
+            }
+        }
+        /* --- iPad Landscape & Large Screens --- */
+        @media (min-width: 1024px) and (orientation: landscape) {
+            .glass-panel {
+                max-width: 95% !important;
+                margin: 0 auto;
+                padding: 1rem !important;
+            }
+
+            .day-cell {
+                min-height: 5.5rem !important;
+            }
+
+            main {
+                padding-bottom: 140px !important;
+            }
+        }
+
+        /* เพิ่มความสมูทตอน Navbar เลื่อนเก็บ */
+        app-navbar {
+            transition: transform 0.4s ease;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen relative text-slate-800">
+
+    <app-header></app-header>
+
+    <main class="flex-1 flex flex-col relative">
+        
+        <div class="glass-header z-20 px-6 py-4 flex justify-between items-end shadow-sm">
+            <div>
+                <button onclick="openSelectionModal()" class="group flex items-center gap-1.5 text-[11px] font-bold text-indigo-500 uppercase tracking-wider mb-1 transition hover:text-indigo-700">
+                    <span class="w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition"><i class="fas fa-exchange-alt text-[9px]"></i></span>
+                    เปลี่ยนมุมมอง
+                </button>
+                
+                <button onclick="openDatePicker()" class="flex items-center gap-2 group transition-all active:scale-95">
+                    <h1 id="monthYearDisplay" class="text-3xl font-extrabold text-slate-800 tracking-tight leading-none group-hover:text-indigo-600 transition">...</h1>
+                    <div class="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 group-hover:border-indigo-200 group-hover:text-indigo-500 transition">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </button>
+            </div>
+
+            <div class="flex gap-2 mb-1">
+                <button onclick="window.toggleBottomNav()" 
+                    class="w-10 h-10 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 flex items-center justify-center hover:bg-indigo-700 transition active:scale-90" 
+                    title="ซ่อน/แสดงเมนู">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+
+                <button onclick="changeMonth(-1)" class="w-10 h-10 rounded-2xl bg-white/60 border border-white/50 shadow-sm flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 hover:shadow-md transition active:scale-90"><i class="fas fa-chevron-left"></i></button>
+                <button onclick="changeMonth(1)" class="w-10 h-10 rounded-2xl bg-white/60 border border-white/50 shadow-sm flex items-center justify-center text-slate-500 hover:bg-white hover:text-indigo-600 hover:shadow-md transition active:scale-90"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+
+        <div class="flex-1 p-4 md:p-6" style="padding-bottom: 140px !important;">
+            
+            <div class="glass-panel rounded-[2rem] p-5 md:p-8 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-200 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-purple-200 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+
+                <div class="grid grid-cols-7 mb-6 text-center">
+                    <div class="text-xs font-bold text-slate-400">จ</div>
+                    <div class="text-xs font-bold text-slate-400">อ</div>
+                    <div class="text-xs font-bold text-slate-400">พ</div>
+                    <div class="text-xs font-bold text-slate-400">พฤ</div>
+                    <div class="text-xs font-bold text-slate-400">ศ</div>
+                    <div class="text-xs font-bold text-indigo-500">ส</div>
+                    <div class="text-xs font-bold text-rose-500">อา</div>
+                </div>
+
+                <div id="calendarGrid" class="grid grid-cols-7 gap-y-2 gap-x-1 md:gap-4 relative z-10"></div>
+            </div>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+    <div id="scheduleTypeModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-6 transition-opacity duration-300 hidden opacity-0">
+        <div class="glass-modal w-full max-w-sm rounded-[2.5rem] p-8 text-center transform scale-90 transition-all duration-300 relative overflow-hidden" id="typeModalContent">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            <div class="w-20 h-20 bg-gradient-to-br from-indigo-100 to-white rounded-[2rem] mx-auto flex items-center justify-center shadow-inner mb-6 border border-white"><i class="fas fa-layer-group text-4xl text-indigo-500 drop-shadow-sm"></i></div>
+            <h2 class="text-2xl font-extrabold text-slate-800 mb-2">เลือกมุมมอง</h2>
+            <p class="text-slate-500 text-sm mb-8 px-2">เลือกรูปแบบตารางที่ต้องการแสดงผล</p>
+            <div class="space-y-3">
+                <button onclick="selectScheduleType('personal')" class="w-full bg-white/80 hover:bg-white border border-white/60 p-4 rounded-2xl flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-indigo-100/50 hover:-translate-y-1 group">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300"><i class="fas fa-user-nurse"></i></div>
+                    <div class="text-left flex-1"><h3 class="font-bold text-slate-800 group-hover:text-indigo-700 transition">เวรของฉัน</h3><p class="text-[10px] text-slate-400">ตารางงานส่วนตัว</p></div>
+                    <i class="fas fa-check-circle text-indigo-500 transition"></i>
+                </button>
+                <button onclick="selectScheduleType('full')" class="w-full bg-white/80 hover:bg-white border border-white/60 p-4 rounded-2xl flex items-center gap-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-purple-100/50 hover:-translate-y-1 group">
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shadow-inner group-hover:bg-purple-600 group-hover:text-white transition-colors duration-300"><i class="fas fa-users"></i></div>
+                    <div class="text-left flex-1"><h3 class="font-bold text-slate-800 group-hover:text-purple-700 transition">ตารางเวรรวม</h3><p class="text-[10px] text-slate-400">ภาพรวมทั้งแผนก</p></div>
+                    <i class="fas fa-chevron-right text-slate-300 group-hover:text-purple-400 transition"></i>
+                </button>
+            </div>
+            <div class="mt-8"><a href="#" id="modal-home-link" class="text-xs text-slate-400 hover:text-indigo-600 font-bold transition uppercase tracking-wide">กลับหน้าหลัก</a></div>
+        </div>
+    </div>
+
+    <div id="datePickerModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md hidden opacity-0 transition-opacity duration-300 flex items-center justify-center p-6">
+        <div class="glass-modal w-full max-w-sm rounded-[2.5rem] p-6 transform scale-95 transition-transform duration-300" id="datePickerContent">
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h3 class="text-xl font-bold text-slate-800">เปลี่ยนเดือน</h3>
+                <button onclick="closeDatePicker()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500 transition"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex justify-center items-center gap-4 mb-6 bg-slate-50/50 p-2 rounded-2xl border border-white">
+                <button onclick="adjustPickerYear(-1)" class="w-10 h-10 rounded-xl bg-white shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition"><i class="fas fa-minus"></i></button>
+                <span id="pickerYearDisplay" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 px-4">2568</span>
+                <button onclick="adjustPickerYear(1)" class="w-10 h-10 rounded-xl bg-white shadow-sm text-slate-600 hover:text-indigo-600 active:scale-90 transition"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="grid grid-cols-3 gap-3"></div>
+        </div>
+    </div>
+
+    <div id="detailSheetBackdrop" class="fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm hidden transition-opacity duration-300" onclick="closeDetailSheet()"></div>
+    <div id="detailSheet" class="fixed bottom-0 left-0 right-0 z-50 glass-modal rounded-t-[2.5rem] shadow-[0_-10px_60px_rgba(0,0,0,0.15)] transform translate-y-full transition-transform duration-300 ease-out max-w-screen-md mx-auto border-b-0">
+        <div class="p-6 pb-safe">
+            <div class="w-12 h-1.5 bg-slate-300/50 rounded-full mx-auto mb-8"></div> 
+            <div id="sheetContent"></div>
+            <button onclick="closeDetailSheet()" class="w-full mt-4 bg-slate-100/80 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-200 transition backdrop-blur-md">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+
+    <div id="postModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[70] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="glass-modal w-full max-w-md p-6 rounded-[2.5rem] shadow-2xl transform scale-90 transition-all duration-300 relative overflow-hidden" id="postModalContent">
+            
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <span class="w-10 h-10 rounded-xl bg-pink-50 text-pink-500 flex items-center justify-center"><i class="fas fa-bullhorn"></i></span>
+                    โพสต์หาคนแลกเวร
+                </h3>
+                <button onclick="closePostModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+
+            <form id="createPostForm" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">วันที่อยากได้ (ไม่ระบุก็ได้)</label>
+                    <input type="text" id="post-desired-date" placeholder="ใครก็ได้ / วันไหนก็ได้" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 transition">
+                </div>
+
+                <div class="bg-pink-50/50 rounded-2xl p-4 border border-pink-100">
+                    <label class="block text-xs font-bold text-pink-800 mb-2 uppercase tracking-wide">เลือกเวรของคุณที่จะปล่อย</label>
+                    <div class="relative">
+                        <select id="post-my-shift" class="w-full bg-white border border-pink-200 rounded-xl p-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer appearance-none" required>
+                            <option value="">กำลังโหลดเวรของคุณ...</option>
+                        </select>
+                        <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-pink-300 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">ข้อความเพิ่มเติม</label>
+                    <textarea id="post-note" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-500 placeholder-slate-400" placeholder="เช่น ติดธุระด่วน..."></textarea>
+                </div>
+
+                <button type="submit" id="btn-create-post" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fas fa-paper-plane"></i> โพสต์ลงกระดาน
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="sellShiftModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-md hidden opacity-0 transition-opacity duration-300 p-4">
+        <div class="glass-modal w-full max-w-sm rounded-[2.5rem] p-8 text-center transform scale-90 transition-all duration-300 relative overflow-hidden" id="sellModalContent">
+            
+            <div class="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full mx-auto flex items-center justify-center mb-6 text-3xl shadow-inner">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+
+            <h2 class="text-2xl font-extrabold text-slate-800 mb-2">ประกาศขายเวร</h2>
+            <p class="text-slate-500 text-sm mb-6">เพื่อนร่วมงานจะเห็นประกาศและกดซื้อได้</p>
+
+            <div class="mb-4 bg-white/50 p-4 rounded-2xl border border-white/60">
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">ราคาที่ต้องการ (บาท)</label>
+                <input type="number" id="sellPrice" value="500" class="w-full bg-transparent text-center text-3xl font-black text-slate-700 focus:outline-none border-b-2 border-slate-200 focus:border-emerald-500 transition pb-2" placeholder="0.00">
+            </div>
+
+            <div class="mb-6 text-left">
+                <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">ข้อความเพิ่มเติม (ถ้ามี)</label>
+                <textarea id="sellMessage" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-slate-400" placeholder="เช่น ต่อรองได้, รีบขาย..."></textarea>
+            </div>
+
+            <div class="space-y-3">
+                <button id="btn-confirm-sell" onclick="confirmSell()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 transition transform active:scale-95">
+                    ยืนยันการขาย
+                </button>
+                <button onclick="closeSellModal()" class="w-full py-3 text-slate-400 font-bold hover:text-slate-600 transition">
+                    ยกเลิก
+                </button>
+            </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // ✅ ใช้ API_BASE จาก components.js
+        let currentDate = new Date();
+        let pickerYear = currentDate.getFullYear();
+        let shiftsData = [];
+        let holidayData = [];
+        let currentUser = null; 
+        const THAI_MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        const THAI_MONTHS_FULL = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const userStr = localStorage.getItem('user');
+            const token = localStorage.getItem('token'); 
+
+            if(!userStr || !token) return window.location.href = 'login.html';
+            
+            currentUser = JSON.parse(userStr);
+
+            const homeUrl = (currentUser.RoleID == 1) ? 'Headnurse_dashboard.html' : 'dashboard.html';
+            document.getElementById('modal-home-link').href = homeUrl;
+
+            flatpickr("#post-desired-date", { locale: "th", dateFormat: "Y-m-d", altInput: true, altFormat: "j F Y", disableMobile: "true" });
+
+            const perfEntries = performance.getEntriesByType("navigation");
+            let isReload = false;
+            if (perfEntries.length > 0 && perfEntries[0].type === 'reload') isReload = true;
+
+            const referrer = document.referrer || ""; 
+            const cameFromFullSchedule = referrer.includes("fullschedule.html");
+
+            if (!isReload && !cameFromFullSchedule) {
+                openSelectionModal();
+            }
+
+            renderHeader();
+            loadSchedule();
+            generatePickerMonths();
+
+            document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
+        });
+
+        function renderHeader() {
+            const monthStr = THAI_MONTHS_FULL[currentDate.getMonth()];
+            const yearStr = currentDate.getFullYear() + 543;
+            document.getElementById('monthYearDisplay').innerText = `${monthStr} ${yearStr}`;
+        }
+
+        async function loadSchedule() {
+            const month = currentDate.getMonth() + 1;
+            const year = currentDate.getFullYear();
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '<div class="col-span-7 py-24 text-center"><i class="fas fa-spinner fa-spin text-indigo-500 text-3xl"></i></div>';
+
+            try {
+                // ✅ ดึงข้อมูลพร้อมกันทั้งตารางเวรและวันหยุด
+                const [shiftRes, holidayRes] = await Promise.all([
+                    apiRequest(`${API_BASE}/api/monthly-schedule`, {
+                        method: 'POST',
+                        body: JSON.stringify({ userId: currentUser.UserID, month, year })
+                    }),
+                    // สมมติว่าคุณมี API นี้ (ถ้าไม่มีให้แจ้ง ผมจะเขียน Mockup ให้)
+                    fetch(`${API_BASE}/api/public-holidays?month=${month}&year=${year}`)
+                ]);
+
+                const shiftDataJson = await shiftRes.json();
+                let holidayDataJson = { success: false, holidays: [] };
+                
+                try { holidayDataJson = await holidayRes.json(); } catch(e) {}
+
+                if(shiftDataJson.success) {
+                    shiftsData = shiftDataJson.shifts;
+                    holidayData = holidayDataJson.holidays || []; // เก็บข้อมูลวันหยุด
+                    renderGrid(month, year);
+                } else {
+                    grid.innerHTML = '<div class="col-span-7 py-20 text-center text-slate-400 font-light">ไม่พบข้อมูล</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                grid.innerHTML = '<div class="col-span-7 py-20 text-center text-red-400 font-light">เกิดข้อผิดพลาด</div>';
+            }
+        }
+
+        function renderGrid(month, year) {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            // ดึงวันแรกของเดือน (0 = อาทิตย์, 1 = จันทร์, ..., 6 = เสาร์)
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const today = new Date();
+
+            /**
+            * 🔥 ปรับ Logic สำหรับการเริ่มวันจันทร์:
+            * จันทร์=0, อังคาร=1 ... เสาร์=5, อาทิตย์=6
+            */
+            const startingDay = (firstDay === 0) ? 6 : firstDay - 1;
+
+            // 1. วาดช่องว่างก่อนเริ่มวันที่ 1 ของเดือน
+            for (let i = 0; i < startingDay; i++) {
+                grid.innerHTML += `<div></div>`;
+            }
+
+            // 2. วาดช่องวันที่ในแต่ละวัน
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // กรองข้อมูลเวร
+                const dayShifts = shiftsData.filter(s => s.Nurse_Date.startsWith(dateStr));
+                const hasShift = dayShifts.length > 0;
+
+                // ✅ ตรวจสอบวันหยุดนักขัตฤกษ์ (ค้นหาจากตัวแปร holidayData)
+                const holiday = (typeof holidayData !== 'undefined') ? holidayData.find(h => h.HolidayDate.startsWith(dateStr)) : null;
+                const isHoliday = !!holiday;
+
+                // ตรวจสอบวันปัจจุบัน
+                let isToday = (day === today.getDate() && 
+                            month === (today.getMonth() + 1) && 
+                            year === today.getFullYear());
+                
+                let cellClass = `day-cell relative flex flex-col items-center cursor-pointer select-none animate-pop`;
+
+                // ✅ เพิ่ม Class ตามสถานะ (วันนี้ / วันหยุด / มีเวร)
+                if (isToday) {
+                    cellClass += ' today';
+                } else if (isHoliday) {
+                    cellClass += ' bg-rose-50/60 is-holiday'; // ไฮไลท์พื้นหลังวันหยุด
+                } else {
+                    cellClass += hasShift ? ' has-shift' : ' text-slate-400';
+                }
+
+                // --- สร้าง HTML สำหรับแถบสี (Shift Bars) และชื่อวันหยุด ---
+                let barsHtml = '<div class="flex flex-col w-full items-center gap-0.5">';
+                
+                // ✅ 1. ถ้าเป็นวันหยุด ให้แสดงชื่อวันหยุดก่อน
+                if (isHoliday) {
+                    barsHtml += `<div class="holiday-name text-[8px] text-rose-500 font-bold mb-0.5 text-center leading-tight truncate px-1">${holiday.HolidayName}</div>`;
+                }
+
+                // 2. แสดงแถบเวร (ถ้ามี)
+                if (hasShift) {
+                    dayShifts.forEach(shift => {
+                        let barColorClass = 'bg-slate-400';
+                        if (shift.ShiftName.includes('เช้า')) barColorClass = 'bar-morning';
+                        else if (shift.ShiftName.includes('บ่าย')) barColorClass = 'bar-afternoon';
+                        else if (shift.ShiftName.includes('ดึก')) barColorClass = 'bar-night';
+
+                        barsHtml += `<div class="shift-bar ${barColorClass}">${shift.ShiftName}</div>`;
+                    });
+                }
+                barsHtml += '</div>';
+
+                // สร้าง Element สำหรับแต่ละช่องวันที่
+                const delay = (day * 0.02).toFixed(2);
+                const cell = document.createElement('div');
+                cell.className = cellClass;
+                cell.style.animationDelay = `${delay}s`;
+
+                // ✅ ถ้าเป็นวันหยุด ให้สีเลขวันที่เป็นสีแดง
+                const dateNumberStyle = isHoliday && !isToday ? 'color: #f43f5e;' : '';
+
+                cell.innerHTML = `
+                    <span class="date-number font-bold z-10" style="${dateNumberStyle}">${day}</span>
+                    ${barsHtml}
+                `;
+
+                // เมื่อคลิกที่วันที่มีเวร ให้เปิด Detail Sheet
+                if (hasShift) {
+                    cell.onclick = () => openDetailSheet(dayShifts, day);
+                } else if (isHoliday) {
+                    // (ทางเลือก) ถ้าไม่มีเวรแต่เป็นวันหยุด อาจจะแสดงชื่อวันหยุดแบบตัวใหญ่เมื่อกดก็ได้
+                    cell.onclick = () => {
+                        Swal.fire({
+                            title: holiday.HolidayName,
+                            text: 'วันนี้เป็นวันหยุดนักขัตฤกษ์',
+                            icon: 'info',
+                            confirmButtonColor: '#6366f1',
+                            customClass: { popup: 'rounded-[2rem]' }
+                        });
+                    };
+                }
+
+                grid.appendChild(cell);
+            }
+        }
+       // --- SHEET LOGIC (Updated: 2 Buttons) ---
+        function openDetailSheet(shifts, day) {
+            const backdrop = document.getElementById('detailSheetBackdrop');
+            const sheet = document.getElementById('detailSheet');
+            const content = document.getElementById('sheetContent');
+            
+            // สร้าง String วันที่ภาษาไทย
+            const dateStr = `${day} ${THAI_MONTHS_FULL[currentDate.getMonth()]} ${currentDate.getFullYear()+543}`;
+            
+            let shiftsHtml = '';
+            shifts.forEach(shift => {
+                let icon = 'fa-sun';
+                let color = 'text-blue-500 bg-blue-50';
+                if(shift.ShiftName.includes('บ่าย')) { icon = 'fa-cloud-sun'; color = 'text-orange-500 bg-orange-50'; }
+                if(shift.ShiftName.includes('ดึก')) { icon = 'fa-moon'; color = 'text-purple-500 bg-purple-50'; }
+
+                const shiftStartDateTime = new Date(`${shift.Nurse_Date}T${shift.StartTime}`);
+                const isPast = new Date() > shiftStartDateTime;
+
+                // แก้ไขปุ่มกดให้ส่ง scheduleId และข้อมูลที่จำเป็น
+                shiftsHtml += `
+                    <div class="shift-card-large flex items-center gap-6 bg-white border border-slate-100 shadow-md mb-4">
+                        <div class="w-20 h-20 rounded-3xl ${color} flex items-center justify-center text-4xl shadow-inner">
+                            <i class="fas ${icon}"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">${shift.ShiftName}</div>
+                            <div class="time-display-large font-black text-slate-800">
+                                ${shift.StartTime.slice(0,5)} - ${shift.EndTime.slice(0,5)}
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            ${isPast ? 
+                                `<span class="px-4 py-2 font-bold text-slate-400 bg-slate-100 rounded-xl text-sm text-center">จบเวร</span>` : 
+                                `<button onclick="clickRequestTrade('${shift.ScheduleID}')" class="action-btn-large font-bold text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition shadow-sm">แลกเวร</button>
+                                <button onclick="openSellModal('${shift.ScheduleID}', '${dateStr}', '${shift.ShiftName}')" class="action-btn-large font-bold text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition shadow-sm">ขายเวร</button>`
+                            }
+                        </div>
+                    </div>
+                `;
+            });
+
+            content.innerHTML = `
+                <div class="text-center mb-8">
+                    <h2 class="text-4xl font-black text-slate-800 mb-2">${dateStr}</h2>
+                    <span class="px-4 py-1.5 bg-indigo-50 text-indigo-500 rounded-full text-sm font-bold tracking-wide uppercase">ตารางงานประจำวัน</span>
+                </div>
+                <div class="max-h-[50vh] overflow-y-auto no-scrollbar px-2">
+                    ${shiftsHtml}
+                </div>
+            `;
+            
+            backdrop.classList.remove('hidden');
+            setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+            sheet.classList.remove('translate-y-full');
+        }
+
+        function closeDetailSheet() {
+            const backdrop = document.getElementById('detailSheetBackdrop');
+            const sheet = document.getElementById('detailSheet');
+            sheet.classList.add('translate-y-full'); backdrop.classList.add('opacity-0'); setTimeout(() => backdrop.classList.add('hidden'), 300);
+        }
+
+        // --- SELL SHIFT LOGIC (แก้ไขใหม่ให้ตรงกับ DB PostSell) ---
+        function openSellModal(scheduleId, dateStr, shiftName) {
+            closeDetailSheet();
+            const modal = document.getElementById('sellShiftModal');
+            const content = document.getElementById('sellModalContent');
+            
+            // เก็บค่า scheduleId ไว้ใช้ตอนกด confirm
+            modal.setAttribute('data-schedule-id', scheduleId);
+
+            // เคลียร์ค่าเดิม
+            document.getElementById('sellPrice').value = '500';
+            document.getElementById('sellMessage').value = '';
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-90');
+                content.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeSellModal() {
+            const modal = document.getElementById('sellShiftModal');
+            const content = document.getElementById('sellModalContent');
+            modal.classList.add('opacity-0');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-90');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        async function confirmSell() {
+            const modal = document.getElementById('sellShiftModal');
+            const scheduleId = modal.getAttribute('data-schedule-id');
+            const price = document.getElementById('sellPrice').value;
+            const message = document.getElementById('sellMessage').value;
+            const btn = document.getElementById('btn-confirm-sell');
+            const token = localStorage.getItem('token'); 
+            
+            // 1. Validation: ตรวจสอบข้อมูลเบื้องต้น
+            if(!price || price <= 0) {
+                return Swal.fire({
+                    icon: 'warning',
+                    title: 'ข้อมูลไม่ครบถ้วน',
+                    text: 'กรุณาระบุราคาที่ต้องการขายให้ถูกต้อง',
+                    confirmButtonColor: '#4f46e5'
+                });
+            }
+
+            // 2. UI State: เปลี่ยนสถานะปุ่มเพื่อป้องกันการกดย้ำ (Double Click)
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> กำลังบันทึก...';
+            btn.disabled = true;
+
+            try {
+                // 3. API Call: ส่งข้อมูลไปยัง Backend
+                const res = await apiRequest(`${API_BASE}/api/sell-shift`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        userId: currentUser.UserID,
+                        scheduleId: scheduleId,
+                        price: price,
+                        message: message
+                    })
+                });
+
+                // 4. Check Authentication: ถ้า Token หมดอายุให้ไปหน้า Login
+                if (res.status === 401) { 
+                    window.location.href = 'login.html'; 
+                    return; 
+                }
+                
+                const data = await res.json();
+                
+                // 5. Success Handling
+                if(data.success) {
+                    closeSellModal(); // ปิดหน้าต่าง Modal ขาย
+                    
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'ลงประกาศขายสำเร็จ!',
+                        text: 'ระบบกำลังนำคุณไปยังหน้าประกาศของคุณ',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        customClass: { popup: 'rounded-3xl' }
+                    });
+
+                    // 🔴 จุดสำคัญ: Redirect พร้อมส่ง Parameter เพื่อไปเปิด Tab "ของฉัน"
+                    window.location.href = 'trade_market.html?tab=my-posts';
+
+                } else {
+                    // กรณี Backend แจ้ง Error เช่น เวรนี้ถูกขายไปแล้ว หรือติดธุรกรรมอื่น
+                    throw new Error(data.message || 'เกิดข้อผิดพลาดในการประกาศขาย');
+                }
+
+            } catch(e) {
+                console.error('Confirm Sell Error:', e);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ทำรายการไม่สำเร็จ',
+                    text: e.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ โปรดลองอีกครั้ง',
+                    confirmButtonColor: '#ef4444'
+                });
+            } finally {
+                // คืนค่าปุ่มกลับมาเป็นปกติ
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- BRIDGE FUNCTION: เชื่อม Detail Sheet กับ Post Modal (แลกเวร) ---
+        function clickRequestTrade(scheduleId) {
+            closeDetailSheet(); 
+            openPostModal(scheduleId);
+        }
+
+        // ================= 5. POST MODAL LOGIC (แบบระบุเจาะจงเวร) =================
+        async function openPostModal(targetId = null) {
+            const token = localStorage.getItem('token');
+            const select = document.getElementById('post-my-shift');
+            const postModal = document.getElementById('postModal');
+            const postModalContent = document.getElementById('postModalContent');
+            
+            // รีเซ็ตฟอร์มก่อนเริ่ม
+            document.getElementById('createPostForm').reset();
+            select.innerHTML = '<option value="" disabled selected>🔄 กำลังตรวจสอบสถานะเวร...</option>';
+
+            try {
+                const res = await apiRequest(`${API_BASE}/api/schedule/my-future-shifts/${currentUser.UserID}`);
+                const data = await res.json();
+
+                if (data.success && data.results.length > 0) {
+                    // 1. ตรวจสอบเวรที่เลือกมาจากตารางก่อน (Validation)
+                    if (targetId) {
+                        const selectedShift = data.results.find(s => s.ScheduleID == targetId);
+                        
+                        // หากพบเวรแต่ติดธุรกรรม ให้แจ้งเตือนและหยุดการทำงานทันที
+                        if (selectedShift) {
+                            let errorMessage = "";
+                            if (selectedShift.TransactionStatus) {
+                                errorMessage = "เวรนี้อยู่ในระหว่างขั้นตอนการซื้อขาย (รออนุมัติ)";
+                            } else if (selectedShift.SellingStatus === 'Open') {
+                                errorMessage = "เวรนี้ถูกตั้งขายอยู่ในตลาด ไม่สามารถนำมาแลกได้";
+                            } else if (selectedShift.ExchangeStatus === 'pending') {
+                                errorMessage = "เวรนี้มีรายการขอแลกค้างอยู่";
+                            }
+
+                            if (errorMessage) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถแลกเวรได้',
+                                    text: errorMessage,
+                                    confirmButtonColor: '#6366f1'
+                                });
+                                return; // ❌ จบการทำงาน ไม่เปิด Modal
+                            }
+                        }
+                    }
+
+                    // 2. หากผ่านการตรวจสอบ ให้แสดง Modal
+                    postModal.classList.remove('hidden');
+                    setTimeout(() => postModal.classList.remove('opacity-0'), 10);
+                    postModalContent.classList.replace('scale-90', 'scale-100');
+
+                    // 3. สร้างรายการ Dropdown
+                    let options = '<option value="">-- เลือกเวรที่ต้องการปล่อย --</option>';
+                    data.results.forEach(s => {
+                        const dateStr = moment(s.Nurse_Date).add(543, 'years').format('D MMM YY');
+                        const isMatch = (targetId && s.ScheduleID == targetId);
+                        
+                        // ใส่เงื่อนไข disabled ให้เวรอื่นๆ ที่ติดธุรกรรมใน Dropdown ด้วยเพื่อป้องกันการเลือกผิด
+                        const isBusy = (s.TransactionStatus || s.SellingStatus === 'Open' || s.ExchangeStatus === 'pending');
+                        const disabledAttr = (isBusy && !isMatch) ? 'disabled' : '';
+                        const busyText = isBusy ? ' (ติดธุรกรรม)' : '';
+
+                        options += `<option value="${s.ScheduleID}" ${isMatch ? 'selected' : ''} ${disabledAttr}>
+                                        ${dateStr} - ${s.ShiftName}${busyText}
+                                    </option>`;
+                    });
+                    select.innerHTML = options;
+
+                } else {
+                    Swal.fire('ไม่พบเวร', 'คุณไม่มีเวรในอนาคตที่สามารถนำมาแลกได้', 'info');
+                }
+            } catch (err) { 
+                console.error(err);
+                select.innerHTML = '<option value="" disabled>เกิดข้อผิดพลาดในการโหลดข้อมูล</option>'; 
+            }
+        }
+        
+        function closePostModal() {
+            const modal = document.getElementById('postModal');
+            const content = document.getElementById('postModalContent');
+            modal.classList.add('opacity-0'); content.classList.remove('scale-100'); content.classList.add('scale-90');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function handleCreatePost(e) {
+            e.preventDefault();
+            const myShiftId = document.getElementById('post-my-shift').value;
+            const datePicker = document.getElementById('post-desired-date');
+            const desiredDate = datePicker ? datePicker.value : "";
+            const note = document.getElementById('post-note').value;
+            const token = localStorage.getItem('token'); // ✅ ดึง Token
+
+            if(!myShiftId) return Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกเวรของคุณ', 'warning');
+
+            const btn = document.getElementById('btn-create-post');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังโพสต์...'; btn.disabled = true;
+
+            try {
+                const res = await apiRequest(`${API_BASE}/api/posts/create`, {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUser.UserID, scheduleId: myShiftId, desiredDate, note })
+                });
+
+                if (res.status === 401) { window.location.href = 'login.html'; return; } // ✅ 401 Check
+
+                const data = await res.json();
+                if(data.success) {
+                    closePostModal();
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'โพสต์สำเร็จ', 
+                        text: 'โพสต์ของคุณแสดงบนกระดานแล้ว', 
+                        confirmButtonColor: '#f97316', 
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = 'swap_request.html';
+                    });
+                } else { Swal.fire('เกิดข้อผิดพลาด', data.message, 'error'); }
+            } catch (err) { Swal.fire('Error', 'Connection Error', 'error'); }
+            finally { btn.innerHTML = '<i class="fas fa-paper-plane"></i> โพสต์ลงกระดาน'; btn.disabled = false; }
+        }
+
+        // --- UTILS ---
+        function openSelectionModal() { document.getElementById('scheduleTypeModal').classList.remove('hidden'); setTimeout(() => { document.getElementById('scheduleTypeModal').classList.remove('opacity-0'); document.getElementById('typeModalContent').classList.add('scale-100'); }, 10); }
+        function closeSelectionModal() { document.getElementById('scheduleTypeModal').classList.add('opacity-0'); setTimeout(() => document.getElementById('scheduleTypeModal').classList.add('hidden'), 300); }
+        function selectScheduleType(type) { if(type === 'personal') { document.getElementById('scheduleTypeModal').classList.add('opacity-0'); setTimeout(() => document.getElementById('scheduleTypeModal').classList.add('hidden'), 300); } else if(type === 'full') window.location.href = 'fullschedule.html'; }
+        
+        function openDatePicker() { pickerYear = currentDate.getFullYear(); updatePickerYear(); document.getElementById('datePickerModal').classList.remove('hidden'); setTimeout(() => { document.getElementById('datePickerModal').classList.remove('opacity-0'); document.getElementById('datePickerContent').classList.add('scale-100'); }, 10); }
+        function closeDatePicker() { document.getElementById('datePickerModal').classList.add('opacity-0'); setTimeout(() => document.getElementById('datePickerModal').classList.add('hidden'), 300); }
+        function adjustPickerYear(d) { pickerYear+=d; updatePickerYear(); }
+        function updatePickerYear() { document.getElementById('pickerYearDisplay').innerText = pickerYear+543; }
+        
+        function generatePickerMonths() {
+            document.querySelector('#datePickerModal .grid').innerHTML = THAI_MONTHS_SHORT.map((m,i) => `<button onclick="selectMonth(${i})" class="py-3 rounded-2xl bg-white border border-white shadow-sm text-slate-600 font-bold hover:bg-indigo-600 hover:text-white transition hover:shadow-lg">${m}</button>`).join('');
+        }
+        function selectMonth(i) { currentDate.setFullYear(pickerYear); currentDate.setMonth(i); closeDatePicker(); renderHeader(); loadSchedule(); }
+        function changeMonth(d) { currentDate.setMonth(currentDate.getMonth()+d); renderHeader(); loadSchedule(); }
+    </script>
+</body>
+</html>

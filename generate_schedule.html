@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สร้างตารางเวรอัตโนมัติ</title>
+    
+    <link href="css/style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    
+    <script src="lib/sweetalert2.js"></script>
+    <script src="lib/moment.js"></script>
+    <script src="lib/xlsx.full.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script>
+</head>
+<body class="bg-gray-50 font-sans flex flex-col h-screen">
+
+    <app-header></app-header>
+
+    <main class="flex-1 overflow-y-auto pb-24">
+        <div class="max-w-4xl mx-auto p-6 space-y-8">
+            
+            <div class="text-center space-y-2 mt-8">
+                <div class="w-20 h-20 bg-gradient-to-tr from-fuchsia-600 to-pink-500 rounded-3xl mx-auto flex items-center justify-center shadow-lg shadow-fuchsia-200">
+                    <i class="fas fa-robot text-4xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">ระบบจัดเวรอัจฉริยะ</h1>
+                <p class="text-gray-500">ประมวลผลตามกฎความปลอดภัยและความต้องการของพยาบาล</p>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 relative overflow-hidden">
+                <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-fuchsia-50 rounded-full blur-3xl opacity-50"></div>
+                
+                <div class="relative z-10 text-center space-y-6">
+                    <div class="inline-block px-4 py-2 bg-fuchsia-50 text-fuchsia-600 rounded-full text-sm font-bold border border-fuchsia-100">
+                        <i class="far fa-calendar-alt mr-2"></i>
+                        รอบการจัดเวร: <span id="target-month-display">...</span>
+                    </div>
+
+                    <div id="existing-warning" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 max-w-md mx-auto flex items-center gap-3">
+                        <i class="fas fa-exclamation-triangle text-amber-500 text-xl"></i>
+                        <div class="text-left">
+                            <p class="text-sm font-bold text-amber-700">พบตารางเวรของเดือนนี้แล้ว</p>
+                            <p class="text-xs text-amber-600">การกดประมวลผลใหม่จะ <span class="underline">ลบข้อมูลเดิมทั้งหมด</span> และสร้างใหม่</p>
+                        </div>
+                    </div>
+
+                    <div id="action-area">
+                        <button id="btn-start-generate" class="group relative w-full md:w-2/3 mx-auto bg-gray-900 text-white p-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-r from-fuchsia-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <div class="relative flex items-center justify-center gap-3">
+                                <i id="btn-icon" class="fas fa-bolt text-xl text-yellow-300 animate-pulse"></i>
+                                <span id="btn-text" class="text-lg font-bold">เริ่มประมวลผลจัดเวร</span>
+                            </div>
+                        </button>
+                        <p class="text-xs text-gray-400 mt-4">ระบบจะคำนวณเวรให้พยาบาลทุกคนอย่างเป็นธรรม</p>
+                    </div>
+
+                    <div id="loading-area" class="hidden space-y-4">
+                        <div class="w-16 h-16 border-4 border-fuchsia-200 border-t-fuchsia-600 rounded-full animate-spin mx-auto"></div>
+                        <div class="space-y-1">
+                            <h3 class="text-lg font-bold text-gray-800 animate-pulse">กำลังประมวลผล...</h3>
+                            <p class="text-sm text-gray-500" id="loading-step">กำลังวิเคราะห์กฎความปลอดภัย</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+          <div id="result-section" class="hidden space-y-6">
+                <div class="flex items-center gap-4">
+                    <div class="h-px bg-gray-200 flex-1"></div>
+                    <span class="text-gray-400 text-sm font-medium">ผลลัพธ์การจัดเวร</span>
+                    <div class="h-px bg-gray-200 flex-1"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="success-card" class="hidden bg-emerald-50 border border-emerald-100 p-5 rounded-2xl flex items-center gap-4">
+                        <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xl">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-emerald-800">จัดเวรสำเร็จ</h4>
+                            <p class="text-xs text-emerald-600">เวรส่วนใหญ่ถูกจัดสรรเรียบร้อย</p>
+                        </div>
+                    </div>
+
+                    <div id="incomplete-card" class="hidden bg-rose-50 border border-rose-100 p-5 rounded-2xl flex items-center gap-4">
+                        <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center text-xl">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-rose-800">เวรไม่ครบ <span id="missing-count">0</span> กะ</h4>
+                            <p class="text-xs text-rose-600">โปรดตรวจสอบและจัดการด้วยตนเอง</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="missing-list-container" class="hidden">
+                    <h3 class="text-sm font-bold text-gray-500 mb-3 ml-2">รายการวันที่คนไม่พอ:</h3>
+                    <div id="missing-list" class="space-y-2"></div>
+                </div>
+            </div>
+                <div class="flex flex-col md:flex-row gap-4 pt-4">
+                    <a href="Headnurse_dashboard.html" class="flex-1 bg-white border border-gray-200 text-gray-600 py-3 rounded-xl text-center font-bold hover:bg-gray-50 transition">
+                        กลับหน้าหลัก
+                    </a>
+                    <button id="btn-export-excel" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl text-center font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition flex items-center justify-center gap-2">
+                        <i class="fas fa-file-excel"></i> ดาวน์โหลด Excel
+                    </button>
+                    <a href="schedule.html" class="flex-1 bg-violet-600 text-white py-3 rounded-xl text-center font-bold hover:bg-violet-700 shadow-lg shadow-violet-200 transition">
+                        ดูตารางเวรที่ได้
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+    <script>
+        const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'https://autoshift-backend.onrender.com';
+        let existingScheduleFound = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.RoleID !== 1) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            if (typeof moment !== 'undefined') {
+                const nextMonth = moment().add(1, 'month');
+                document.getElementById('target-month-display').innerText = nextMonth.format('MMMM YYYY');
+                await checkExistingSchedule(nextMonth.month() + 1, nextMonth.year());
+            }
+
+            document.getElementById('btn-start-generate').addEventListener('click', handleGenerateClick);
+            document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
+        });
+
+        async function checkExistingSchedule(month, year) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await apiRequest(`${API_URL}/api/full-schedule`, {
+                    method: 'POST',
+                    body: JSON.stringify({ month, year })
+                });
+                const data = await res.json();
+                if (data.success && data.shifts && data.shifts.length > 0) {
+                    existingScheduleFound = true;
+                    document.getElementById('existing-warning').classList.remove('hidden');
+                    document.getElementById('btn-text').innerText = "ประมวลผลใหม่ (ล้างข้อมูลเดิม)";
+                    document.getElementById('btn-icon').className = "fas fa-sync-alt text-xl text-white animate-spin-slow";
+                    const btn = document.getElementById('btn-start-generate');
+                    btn.className = "group relative w-full md:w-2/3 mx-auto bg-amber-600 text-white p-4 rounded-2xl shadow-xl hover:bg-amber-700 transition-all duration-300 overflow-hidden";
+                }
+            } catch (err) { console.error("Check error:", err); }
+        }
+
+        async function handleGenerateClick() {
+            if (existingScheduleFound) {
+                const result = await Swal.fire({
+                    title: 'ยืนยันการจัดเวรใหม่?',
+                    text: "ระบบจะลบตารางเดิมทิ้งทั้งหมดและสร้างใหม่",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'ใช่, ล้างและสร้างใหม่'
+                });
+                if (!result.isConfirmed) return;
+            }
+            startGeneration();
+        }
+
+      async function startGeneration() {
+        const btnArea = document.getElementById('action-area');
+        const loadArea = document.getElementById('loading-area');
+        const resultSec = document.getElementById('result-section');
+        const stepText = document.getElementById('loading-step');
+
+        // เรียกผ่าน ID เท่านั้น ห้ามใช้ querySelector แบบเดิมเด็ดขาด
+        const successCard = document.getElementById('success-card'); 
+        const incompleteCard = document.getElementById('incomplete-card');
+        const listCont = document.getElementById('missing-list-container');
+
+        // 1. กดเริ่มปุ๊บ สั่งซ่อนผลลัพธ์เก่าทิ้งให้หมดก่อน (เพื่อป้องกันการค้างของหน้าจอ)
+        btnArea.classList.add('hidden');
+        resultSec.classList.add('hidden');
+        
+        // บังคับซ่อนแบบเด็ดขาด (ใช้ style โดยตรงเพื่อความชัวร์)
+        if (successCard) successCard.style.display = 'none';
+        if (incompleteCard) incompleteCard.classList.add('hidden');
+        if (listCont) listCont.classList.add('hidden');
+        
+        loadArea.classList.remove('hidden');
+
+        // จำลองโหลด
+        const steps = ["วิเคราะห์ข้อมูล...", "ตรวจสอบกฎ...", "เกลี่ยเวร...", "บันทึกข้อมูล..."];
+        for (let step of steps) {
+            stepText.innerText = step;
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        try {
+            const res = await apiRequest(`${API_URL}/api/admin/generate-schedule`, { method: 'POST' });
+            const data = await res.json();
+            
+            loadArea.classList.add('hidden');
+            resultSec.classList.remove('hidden');
+
+            if (data.success) {
+                // เช็คว่ามีเวรที่พยาบาลไม่พอ (เช่น เวรดึก) หรือไม่
+                const hasIncomplete = data.incompleteShifts && data.incompleteShifts.length > 0;
+
+                if (hasIncomplete) {
+                    // --- เคส: มีเวรขาด (เวรดึกไม่พอ) ---
+                    
+                    // สั่งซ่อนการ์ดสีเขียวให้หายไปถาวร
+                    if (successCard) {
+                        successCard.classList.add('hidden');
+                        successCard.style.display = 'none'; 
+                    }
+
+                    // แสดงการ์ดสีแดงแจ้งเตือน
+                    if (incompleteCard) {
+                        incompleteCard.classList.remove('hidden');
+                        incompleteCard.style.display = 'flex';
+                    }
+                    
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'จัดเวรไม่สมบูรณ์!',
+                        text: `พบกะดึกหรือกะอื่นๆ ที่พยาบาลไม่พอ ${data.incompleteShifts.length} กะ`,
+                        confirmButtonColor: '#f59e0b'
+                    });
+                    
+                    renderIncomplete(data.incompleteShifts);
+                } else {
+                    // --- เคส: สำเร็จ 100% ---
+                    if (successCard) {
+                        successCard.classList.remove('hidden');
+                        successCard.style.display = 'flex';
+                    }
+                    if (incompleteCard) {
+                        incompleteCard.classList.add('hidden');
+                        incompleteCard.style.display = 'none';
+                    }
+                    
+                    Swal.fire({ icon: 'success', title: 'จัดเวรสำเร็จครบถ้วน!', timer: 2000 });
+                }
+            } else { 
+                throw new Error(data.message); 
+            }
+        } catch (err) {
+            Swal.fire('ผิดพลาด', err.message, 'error');
+            btnArea.classList.remove('hidden');
+            loadArea.classList.add('hidden');
+        }
+    }
+        function renderIncomplete(incomplete) {
+            const card = document.getElementById('incomplete-card');
+            const listCont = document.getElementById('missing-list-container');
+            const list = document.getElementById('missing-list');
+            
+            card.classList.remove('hidden');
+            listCont.classList.remove('hidden');
+            
+            document.getElementById('missing-count').innerText = incomplete.length;
+            
+            list.innerHTML = incomplete.map(item => {
+                const missingCount = item.wanted - item.got;
+                const displayDate = moment(item.date).locale('th').format('D MMM YYYY');
+                
+                // แยกสีตามประเภทกะ ถ้าเป็นกะดึกให้เน้นสีม่วง/น้ำเงิน ถ้ากะอื่นใช้สีแดง
+                const isNightShift = item.shift.includes("ดึก");
+                const badgeClass = isNightShift 
+                    ? "bg-indigo-100 text-indigo-700 border border-indigo-200" 
+                    : "bg-rose-100 text-rose-700 border border-rose-200";
+
+                return `
+                    <div class="bg-white p-4 rounded-xl border-l-4 ${isNightShift ? 'border-indigo-500' : 'border-rose-500'} shadow-sm flex justify-between items-center mb-2">
+                        <div>
+                            <span class="block font-bold text-gray-700">${displayDate}</span>
+                            <span class="text-sm text-gray-500">
+                                กะการทำงาน: <span class="${isNightShift ? 'text-indigo-600' : 'text-rose-600'} font-bold">${item.shift}</span>
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <span class="${badgeClass} px-3 py-1 rounded-full text-xs font-bold">
+                                ขาด ${missingCount} คน
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+       async function exportToExcel() {
+        try {
+            const token = localStorage.getItem('token');
+            const nextMonth = moment().add(1, 'month');
+            const m = nextMonth.month() + 1;
+            const y = nextMonth.year();
+            const daysInMonth = nextMonth.daysInMonth();
+
+            Swal.fire({
+                title: 'กำลังสร้างไฟล์ Excel...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            const res = await apiRequest(`${API_URL}/api/full-schedule`, {
+                method: 'POST',
+                body: JSON.stringify({ month: m, year: y })
+            });
+            const data = await res.json();
+
+            if (data.success && data.shifts && data.shifts.length > 0) {
+                
+                // 1. ดึงข้อมูลพยาบาลและจัดเรียง (Role 1 มาเป็นอันดับ 1 เสมอ)
+                let nurseObjects = [];
+                const seen = new Set();
+                
+                data.shifts.forEach(s => {
+                    const fullName = `${s.FirstName} ${s.LastName}`.trim();
+                    if (!seen.has(fullName)) {
+                        nurseObjects.push({
+                            fullName: fullName,
+                            roleId: s.RoleID || 2
+                        });
+                        seen.add(fullName);
+                    }
+                });
+
+                // Logic การเรียง: หัวหน้า (Role 1) มาก่อนพยาบาลอื่น (Role 2) 
+                // หาก Role เหมือนกันให้เรียงตามชื่อ ก-ฮ
+                nurseObjects.sort((a, b) => {
+                    if (a.roleId !== b.roleId) return a.roleId - b.roleId;
+                    return a.fullName.localeCompare(b.fullName, 'th');
+                });
+
+                const sortedNurseNames = nurseObjects.map(n => n.fullName);
+
+                // 2. กำหนดลำดับ Header เพื่อแก้ปัญหาคอลัมน์กระโดดไปอยู่หลังวันที่
+                const dateHeaders = [];
+                for (let d = 1; d <= daysInMonth; d++) {
+                    dateHeaders.push(`${d}`);
+                }
+                // บังคับลำดับ: ลำดับ -> ชื่อ-นามสกุล -> วันที่ 1-31 -> สรุปยอด
+                const allHeaders = ["ลำดับ", "ชื่อ-นามสกุล", ...dateHeaders, "รวมเวร", "ช", "บ", "ด"];
+
+                // 3. เตรียมข้อมูลสำหรับแต่ละแถว
+                const calendarData = sortedNurseNames.map((fullName, index) => {
+                    const row = {};
+                    row['ลำดับ'] = index + 1;
+                    row['ชื่อ-นามสกุล'] = fullName;
+                    
+                    const myShifts = data.shifts.filter(s => `${s.FirstName} ${s.LastName}`.trim() === fullName);
+                    let countM = 0, countA = 0, countN = 0;
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dateStr = nextMonth.clone().date(d).format('YYYY-MM-DD');
+                        const matches = myShifts.filter(s => s.Nurse_Date.startsWith(dateStr));
+
+                        let shiftText = "";
+                        if (matches.length > 0) {
+                            shiftText = matches.map(s => {
+                                if (s.ShiftName.includes("เช้า")) { countM++; return "ช"; }
+                                if (s.ShiftName.includes("บ่าย")) { countA++; return "บ"; }
+                                if (s.ShiftName.includes("ดึก")) { countN++; return "ด"; }
+                                return "";
+                            }).join("/");
+                        }
+                        row[`${d}`] = shiftText;
+                    }
+
+                    row['รวมเวร'] = countM + countA + countN;
+                    row['ช'] = countM;
+                    row['บ'] = countA;
+                    row['ด'] = countN;
+
+                    return row;
+                });
+
+                // 4. สร้างแผ่นงาน
+                const ws = XLSX.utils.json_to_sheet([]);
+                
+                // เพิ่มหัวรายงาน
+                const reportTitle = [
+                    ["รายงานตารางปฏิบัติงานพยาบาล"],
+                    [`ประจำเดือน: ${nextMonth.locale('th').format('MMMM YYYY')}`],
+                    [] 
+                ];
+                XLSX.utils.sheet_add_aoa(ws, reportTitle, { origin: "A1" });
+                
+                // บังคับลำดับคอลัมน์ด้วย header: allHeaders
+                XLSX.utils.sheet_add_json(ws, calendarData, { 
+                    origin: "A4", 
+                    skipHeader: false,
+                    header: allHeaders 
+                });
+
+                // 5. ตั้งค่าความกว้างคอลัมน์
+                const colWidths = [
+                    { wch: 6 },  // ลำดับ
+                    { wch: 30 }  // ชื่อ-นามสกุล
+                ];
+                for (let i = 1; i <= daysInMonth; i++) colWidths.push({ wch: 4 });
+                colWidths.push({ wch: 8 }, { wch: 5 }, { wch: 5 }, { wch: 5 });
+                ws['!cols'] = colWidths;
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Schedule");
+                XLSX.writeFile(wb, `Nurse_Schedule_${nextMonth.format('YYYY_MM')}.xlsx`);
+
+                Swal.fire({ icon: 'success', title: 'ดาวน์โหลดสำเร็จ', timer: 1500 });
+            } else {
+                Swal.fire('ไม่พบข้อมูล', 'ฐานข้อมูลไม่มีตารางเวรในเดือนนี้', 'warning');
+            }
+        } catch (err) {
+            console.error("Export Error:", err);
+            Swal.fire('เกิดข้อผิดพลาด', 'ไม่สามารถส่งออกไฟล์ได้', 'error');
+        }
+    }
+    </script>
+</body>
+</html>

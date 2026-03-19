@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>จัดการตารางเวรรายวัน - AUTONURSESHIFT</title>
+    
+    <link href="css/style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="lib/flatpickr.css">
+    
+    <script src="lib/flatpickr.js"></script>
+    <script src="lib/th.js"></script>
+    <script src="lib/sweetalert2.js"></script>
+    <script src="lib/moment.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script>
+
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #f8fafc; }
+        
+        /* --- Header Section --- */
+        .header-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 2.5rem;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            margin-bottom: 2.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-bg-circle {
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: #fdf4ff;
+            border-radius: 50%;
+            z-index: 0;
+            opacity: 0.6;
+        }
+
+        /* --- Shift Board & Cards --- */
+        .shift-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 2.25rem;
+            padding: 1.75rem;
+            border: 1px solid white;
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .shift-card:hover { transform: translateY(-5px); }
+
+        .nurse-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 1.25rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #f1f5f9;
+            transition: all 0.2s;
+        }
+
+        .nurse-item:hover { border-color: #f0abfc; background: #fffaff; }
+
+        .initial-box {
+            width: 45px;
+            height: 45px;
+            background: #f1f5f9;
+            color: #64748b;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+
+        .btn-add-nurse {
+            width: 100%;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #fdf4ff;
+            color: #a21caf;
+            border: 2px dashed #f0abfc;
+            border-radius: 1.25rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-add-nurse:hover { background: #fae8ff; border-style: solid; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    
+    <app-header></app-header>
+
+    <main class="max-w-6xl mx-auto p-4 md:p-8 pb-32">
+        
+        <div class="header-card">
+            <div class="header-bg-circle"></div>
+            <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h1 class="text-3xl font-black text-slate-800 tracking-tight">ปรับปรุงตารางเวร</h1>
+                    <p class="text-slate-400 mt-1 font-medium italic underline decoration-fuchsia-200 underline-offset-4">Daily Schedule Management</p>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-4">
+                    <div style="width: 260px;">
+                        <app-date-picker id="daily-picker" input-id="target-date" placeholder="เลือกวันที่ดูตาราง..."></app-date-picker>
+                    </div>
+                    
+                    <button onclick="loadDailyData()" class="bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-fuchsia-100 hover:scale-105 transition active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>ดึงข้อมูล</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="shift-card border-t-[10px] border-yellow-400">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-yellow-50 text-yellow-500 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-sun"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-700">กะเช้า</h3>
+                    </div>
+                    <span id="count-1" class="text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">0 คน</span>
+                </div>
+                <div id="list-1" class="min-h-[150px]"></div>
+                <button onclick="openNurseModal(1)" class="btn-add-nurse">
+                    <i class="fas fa-plus-circle mr-2"></i>เพิ่มเจ้าหน้าที่
+                </button>
+            </div>
+
+            <div class="shift-card border-t-[10px] border-orange-400">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-orange-50 text-orange-500 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-cloud-sun"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-700">กะบ่าย</h3>
+                    </div>
+                    <span id="count-2" class="text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">0 คน</span>
+                </div>
+                <div id="list-2" class="min-h-[150px]"></div>
+                <button onclick="openNurseModal(2)" class="btn-add-nurse">
+                    <i class="fas fa-plus-circle mr-2"></i>เพิ่มเจ้าหน้าที่
+                </button>
+            </div>
+
+            <div class="shift-card border-t-[10px] border-indigo-600">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-moon"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-700">กะดึก</h3>
+                    </div>
+                    <span id="count-3" class="text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">0 คน</span>
+                </div>
+                <div id="list-3" class="min-h-[150px]"></div>
+                <button onclick="openNurseModal(3)" class="btn-add-nurse">
+                    <i class="fas fa-plus-circle mr-2"></i>เพิ่มเจ้าหน้าที่
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <div id="nurse-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">เพิ่มพยาบาล</h2>
+            <p id="modal-subtitle" class="text-slate-400 mb-6 font-medium"></p>
+            
+            <div class="space-y-4">
+                <label class="block text-sm font-bold text-slate-500 uppercase tracking-widest ml-1">เลือกรายชื่อ:</label>
+                <select id="nurse-select" class="w-full border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-fuchsia-500 bg-slate-50 font-bold text-slate-600 appearance-none"></select>
+                
+                <div class="flex gap-3 pt-6">
+                    <button onclick="closeNurseModal()" class="flex-1 py-4 text-slate-400 font-bold hover:bg-slate-50 rounded-2xl transition">ยกเลิก</button>
+                    <button onclick="submitManualAdd()" class="flex-1 py-4 bg-slate-800 text-white font-bold rounded-2xl hover:bg-slate-700 transition shadow-lg">ยืนยันการเพิ่ม</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <app-navbar></app-navbar>
+
+    <script>
+        const API_URL = 'https://autoshift-backend.onrender.com';
+        let currentTargetDate = '';
+        let currentTargetShift = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
+            const picker = document.getElementById('daily-picker');
+            
+            // รอให้คอมโพเนนต์สร้าง input เสร็จก่อน แล้วค่อยเซตวันที่เริ่มต้น
+            setTimeout(() => {
+                const input = document.getElementById('target-date');
+                if(input && input._flatpickr) {
+                    input._flatpickr.setDate(tomorrow);
+                    loadDailyData(); // ดึงข้อมูลครั้งแรก
+                }
+            }, 100);
+
+            // ดักจับเหตุการณ์เปลี่ยนวันที่จากคอมโพเนนต์
+            picker.addEventListener('date-change', (e) => {
+                loadDailyData(); 
+            });
+        });
+
+        async function loadDailyData() {
+            // ดึงค่าจาก id ที่เราตั้งใน input-id ของคอมโพเนนต์
+            const dateInput = document.getElementById('target-date');
+            if(!dateInput) return;
+            
+            currentTargetDate = dateInput.value;
+            const token = localStorage.getItem('token');
+            
+            try {
+                const res = await apiRequest(`${API_URL}/api/admin/daily-schedule?date=${currentTargetDate}`);
+                const data = await res.json();
+                if (data.success) renderShifts(data.shifts);
+            } catch (err) { console.error(err); }
+        }
+
+        function renderShifts(shifts) {
+            [1, 2, 3].forEach(shiftId => {
+                const list = document.getElementById(`list-${shiftId}`);
+                const count = document.getElementById(`count-${shiftId}`);
+                const filtered = shifts.filter(s => s.Shift_id === shiftId);
+                
+                count.innerText = `${filtered.length} คน`;
+                list.innerHTML = filtered.map(s => `
+                    <div class="nurse-item group">
+                        <div class="flex items-center gap-4">
+                            <div class="initial-box">${s.FirstName.charAt(0)}</div>
+                            <div>
+                                <p class="font-bold text-slate-700 leading-none">${s.FirstName} ${s.LastName}</p>
+                                <p class="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Registered Nurse</p>
+                            </div>
+                        </div>
+                        <button onclick="deleteShift(${s.ScheduleID})" class="text-slate-300 hover:text-rose-500 p-2 transition">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `).join('') || '<div class="py-10 text-center opacity-20"><i class="fas fa-user-slash text-4xl mb-2"></i><p class="text-xs font-bold">ไม่มีข้อมูล</p></div>';
+            });
+        }
+
+        async function deleteShift(id) {
+            const result = await Swal.fire({
+                title: 'ลบรายชื่อ?',
+                text: "ยืนยันการลบพยาบาลออกจากกะนี้",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e11d48',
+                confirmButtonText: 'ลบเลย',
+                cancelButtonText: 'ยกเลิก',
+                customClass: { popup: 'rounded-[2rem]' }
+            });
+
+            if (result.isConfirmed) {
+                const token = localStorage.getItem('token');
+                await fetch(`${API_URL}/api/admin/delete-shift/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                loadDailyData();
+                Swal.fire({ icon: 'success', title: 'ลบเรียบร้อย', timer: 1000, showConfirmButton: false });
+            }
+        }
+
+        async function openNurseModal(shiftId) {
+            currentTargetShift = shiftId;
+            const shiftNames = { 1: 'กะเช้า ☀️', 2: 'กะบ่าย ⛅', 3: 'กะดึก 🌙' };
+            document.getElementById('modal-subtitle').innerText = `${shiftNames[shiftId]} | ${moment(currentTargetDate).format('DD MMM YYYY')}`;
+            
+            const token = localStorage.getItem('token');
+            const res = await apiRequest(`${API_URL}/api/admin/all-nurses`);
+            const data = await res.json();
+            
+            const select = document.getElementById('nurse-select');
+            select.innerHTML = '<option value="" disabled selected>เลือกพยาบาล...</option>' + 
+                data.nurses.map(n => `<option value="${n.UserID}">${n.FirstName} ${n.LastName}</option>`).join('');
+            
+            document.getElementById('nurse-modal').classList.remove('hidden');
+        }
+
+        function closeNurseModal() {
+            document.getElementById('nurse-modal').classList.add('hidden');
+        }
+        async function checkFatigueRisk(userId) {
+            const res = await apiRequest(
+                `${API_URL}/api/admin/fatigue-check?userId=${userId}&date=${currentTargetDate}&shiftId=${currentTargetShift}`
+            );
+            return await res.json();
+        }
+
+        async function submitManualAdd() {
+            const userId = document.getElementById('nurse-select').value;
+            if (!userId) return;
+
+            // 🔎 เช็คความล้าก่อน
+            const fatigue = await checkFatigueRisk(userId);
+
+            // 🔴 ความเสี่ยงสูง
+            if (fatigue.riskLevel === "HIGH") {
+                const confirm = await Swal.fire({
+                    icon: 'warning',
+                    title: '⚠ ความเสี่ยงความเหนื่อยล้าสูง',
+                    html: `
+                        <div style="text-align:left">
+                            <p>• ชั่วโมงสะสม 7 วัน: <b>${fatigue.totalHours}</b> ชม.</p>
+                            <p>• กะดึกติดกัน: <b>${fatigue.nightStreak}</b> วัน</p>
+                            <p>• เวลาพักล่าสุด: <b>${fatigue.restHours}</b> ชม.</p>
+                        </div>
+                        <br>
+                        <p>ต้องการยืนยันเพิ่มเวรฉุกเฉินหรือไม่?</p>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: "ยืนยันฉุกเฉิน",
+                    cancelButtonText: "ยกเลิก",
+                    confirmButtonColor: "#dc2626",
+                    customClass: { popup: 'rounded-[2rem]' }
+                });
+
+                if (!confirm.isConfirmed) return;
+            }
+
+            // 🟡 ความเสี่ยงปานกลาง
+            if (fatigue.riskLevel === "MODERATE") {
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'แจ้งเตือน',
+                    text: 'พยาบาลมีภาระงานสะสมค่อนข้างสูง',
+                    timer: 1800,
+                    showConfirmButton: false
+                });
+            }
+
+            // 🚀 ถ้าผ่านหรือกดยืนยันแล้ว → เพิ่มเวร
+            const res = await apiRequest(`${API_URL}/api/admin/add-shift-manual`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    userId,
+                    date: currentTargetDate,
+                    shiftId: currentTargetShift
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                closeNurseModal();
+                loadDailyData();
+                Swal.fire({ icon: 'success', title: 'เพิ่มสำเร็จ', timer: 1000, showConfirmButton: false });
+            } else {
+                Swal.fire('Error', data.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

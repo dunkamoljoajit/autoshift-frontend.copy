@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Head Nurse Dashboard</title>
+    
+    <link href="css/style.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="lib/flatpickr.css">
+    
+    <script src="lib/flatpickr.js"></script>
+    <script src="lib/th.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="lib/moment.js"></script>
+    <script src="components.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        .flatpickr-calendar { font-family: 'Kanit', sans-serif !important; border: none !important; border-radius: 16px !important; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1) !important; padding: 10px !important; width: 320px !important; }
+        .flatpickr-input[readonly] {cursor: pointer;}
+        .flatpickr-day.selected { background: #7c3aed !important; border-color: #7c3aed !important; }
+        .validation-box { background: #f9fafb; border-radius: 12px; padding: 12px 16px; margin-top: 8px; border: 1px solid #e5e7eb; }
+        .validation-box ul { list-style: none; padding: 0; margin: 0; }
+        .validation-box li { font-size: 0.8rem; margin-bottom: 4px; color: #9ca3af; display: flex; align-items: center; gap: 8px; transition: all 0.3s ease; }
+        .validation-box li.valid { color: #10b981; font-weight: 500; }
+        input.mismatch { border-color: #ef4444 !important; background-color: #fef2f2 !important; }
+        input.valid-pass { border-color: #10b981 !important; background-color: #f0fdf4 !important; }
+        input.invalid-pass { border-color: #ef4444 !important; background-color: #fef2f2 !important; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .approval-section { background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color: white; border-radius: 24px; }
+        /* สไตล์ปุ่มบันทึกเมื่อกดใช้งานไม่ได้ */
+        button#btn-save-settings:disabled {
+            /* คงสีเดิมไว้ (ม่วง Gradient) */
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important; 
+            color: white !important;
+            
+            /* คงความมนสวยงามเหมือนเดิม */
+            border-radius: 12px !important; 
+            border: none !important;
+            
+            /* ทำให้ดูแตกต่างเล็กน้อยเพื่อให้รู้ว่า 'ทำงานเสร็จแล้ว' */
+            opacity: 0.85; 
+            
+            /* สำคัญ: ทำให้กดปุ่มไม่ได้และไม่แสดงเมาส์รูปห้ามที่ดูแข็งกระด้าง */
+            pointer-events: none; 
+            cursor: default;
+            box-shadow: none !important;
+        }
+        /* 1. บังคับให้เฉพาะช่อง Input ขยายเต็มพื้นที่ */
+        #date-container {
+            width: 100% !important;
+        }
+
+        /* 2. บังคับให้ Input ที่ Flatpickr สร้างขึ้นมา (altInput) กว้างเท่าช่องด้านบน */
+        .flatpickr-input[readonly] {
+            width: 100% !important;
+        }
+
+        /* 3. ล็อกขนาด "ตัวปฏิทิน" ที่เด้งลงมา ให้มีขนาดปกติ (ตามรูปภาพที่คุณส่งมา) */
+        .flatpickr-calendar {
+            width: 320px !important; /* ขนาดมาตรฐานที่ดูสวย */
+            min-width: 320px !important;
+        }
+        /* จัดตำแหน่งไอคอนดวงตาใน Swal */
+        .swal-input-container {
+            position: relative;
+            width: 100%;
+        }
+        .swal-eye-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #ccc;
+            transition: color 0.3s;
+            z-index: 10;
+        }
+        .swal-eye-icon:hover {
+            color: #191970;
+        }
+        /* สถานะเงื่อนไขที่ผ่านแล้ว */
+        .req-valid {
+            color: #10b981 !important; /* สีเขียว */
+            font-weight: 500;
+        }
+        .req-valid i {
+            color: #10b981 !important;
+        }
+
+        /* ช่อง Input เมื่อรหัสผ่านตรงกัน */
+        .input-match {
+            border-color: #10b981 !important;
+            background-color: #f0fdf4 !important;
+        }
+        /* สถานะเงื่อนไขรหัสผ่านใน Modal */
+        .m-req-item { display: flex; align-items: center; gap: 8px; color: #888; transition: all 0.3s; font-size: 0.85rem; margin-bottom: 4px; }
+        .m-req-item i { font-size: 0.75rem; }
+        .m-req-item.valid { color: #28a745; font-weight: 500; }
+        .m-req-item.valid i { color: #28a745; }
+
+        /* สีของข้อความแจ้งเตือน Match */
+        .m-text-success { color: #28a745; font-size: 0.8rem; }
+        .m-text-danger { color: #dc3545; font-size: 0.8rem; }
+        /* สถานะเมื่อปุ่มถูกล็อก */
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+            filter: grayscale(0.5);
+        }
+        /* บังคับ Padding ให้กับ Input ทุกตัวที่ Flatpickr สร้างขึ้น (รวม altInput) */
+        .flatpickr-input.form-control,
+        input.flatpickr-input {
+            padding-left: 3rem !important; /* เว้นที่ให้ไอคอนปฏิทินทางซ้าย */
+            font-family: 'Kanit', sans-serif !important;
+        }
+
+        /* จัดการตำแหน่งไอคอนให้ลอยอยู่บนสุดเสมอ */
+        #date-container i {
+            z-index: 10;
+            pointer-events: none; /* เพื่อให้คลิกทะลุไอคอนไปโดนช่อง input ได้ */
+        }
+        /* บังคับให้ช่องวันที่ตัวใหม่ที่โชว์หน้าจอ มี Padding ซ้ายหลบไอคอน */
+        .flatpickr-mobile + input, 
+        .flatpickr-input + input,
+        input[readonly].flatpickr-input {
+            padding-left: 3.5rem !important; /* ขยับตัวอักษรออกมา */
+        }
+
+        /* จัดการ Placeholder ของ Flatpickr ให้เขยิบด้วย */
+        .flatpickr-input::placeholder {
+            padding-left: 0; 
+            color: #9ca3af;
+        }
+
+        /* ป้องกันไอคอนจม ให้ลอยเด่นเสมอ */
+        #date-container i {
+            z-index: 50 !important;
+        }
+        #btn-generate-real {
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    <div id="toast-container" class="fixed top-4 right-4 z-[10000] flex flex-col gap-2 pointer-events-none"></div>
+
+    <app-header></app-header>
+    
+    <main class="flex-1 overflow-y-auto bg-[#f8f9fa] pb-32">
+        <div class="max-w-screen-md mx-auto p-4 space-y-6">
+
+            <div class="approval-section p-6 shadow-xl shadow-indigo-100 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 backdrop-blur-3xl"></div>
+                <div class="relative z-10">
+                    <h3 class="text-lg font-bold flex items-center gap-2 mb-4">
+                        <i class="fas fa-check-double"></i> ศูนย์อนุมัติรายการ
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <a href="swap_request.html" class="bg-white/20 hover:bg-white/30 transition-all p-4 rounded-2xl flex flex-col items-center relative group">
+                            <span id="pending-swap-count" class="text-2xl font-black">0</span>
+                            <span class="text-[10px] uppercase tracking-wider opacity-80">รออนุมัติแลกเวร</span>
+                        </a>
+                        <a href="trade_market.html" class="bg-white/20 hover:bg-white/30 transition-all p-4 rounded-2xl flex flex-col items-center relative group">
+                            <span id="pending-trade-count" class="text-2xl font-black">0</span>
+                            <span class="text-[10px] uppercase tracking-wider opacity-80">รออนุมัติซื้อขาย</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modern-card p-6 relative">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-sliders-h text-violet-600"></i> ตั้งค่าระบบรับเวร
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-1" id="period-status-text">กำลังตรวจสอบสถานะ...</p>
+                    </div>
+                    <div class="flex bg-gray-100 p-1 rounded-full">
+                        <button onclick="togglePeriod('Open')" id="btn-open" class="toggle-btn toggle-inactive">OPEN</button>
+                        <button onclick="togglePeriod('Closed')" id="btn-closed" class="toggle-btn toggle-inactive">CLOSED</button>
+                    </div>
+                </div>
+
+               <form id="scheduleSettingsForm" class="space-y-4 mb-10"> <div class="flex bg-gray-200 p-1.5 rounded-2xl mb-4 shadow-inner">
+                    <button type="button" onclick="switchDayType('weekday')" id="tab-weekday" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all bg-white shadow-sm text-violet-600">
+                        จันทร์ - ศุกร์
+                    </button>
+                    <button type="button" onclick="switchDayType('weekend')" id="tab-weekend" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all text-gray-500">
+                        เสาร์ - อาทิตย์
+                    </button>
+                    <button type="button" onclick="switchDayType('holiday')" id="tab-holiday" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all text-gray-500">
+                        นักขัตฤกษ์
+                    </button>
+                </div>
+
+                    <div class="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 space-y-6">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 block text-center" id="quota-label">
+                                จำนวนพยาบาลต่อเวร (วันจันทร์-ศุกร์)
+                            </label>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="text-center">
+                                    <div class="text-[10px] text-gray-400 mb-2 font-bold uppercase"><i class="fas fa-sun text-amber-400 mr-1"></i>เช้า</div>
+                                    <input type="number" id="quotaMorning" class="stat-input w-full bg-gray-50 border-none rounded-2xl py-3 text-center font-bold text-gray-700" placeholder="0" min="1" required>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-[10px] text-gray-400 mb-2 font-bold uppercase"><i class="fas fa-cloud-sun text-orange-400 mr-1"></i>บ่าย</div>
+                                    <input type="number" id="quotaAfternoon" class="stat-input w-full bg-gray-50 border-none rounded-2xl py-3 text-center font-bold text-gray-700" placeholder="0" min="1" required>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-[10px] text-gray-400 mb-2 font-bold uppercase"><i class="fas fa-moon text-indigo-400 mr-1"></i>ดึก</div>
+                                    <input type="number" id="quotaNight" class="stat-input w-full bg-gray-50 border-none rounded-2xl py-3 text-center font-bold text-gray-700" placeholder="0" min="1" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-50">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block ml-1">วันปิดรับข้อมูล (DEADLINE)</label>
+                            <div id="date-container" class="relative group w-full">
+                                <input type="text" id="deadlineDate" placeholder="เลือกวันที่..." 
+                                    class="w-full bg-gray-50 border-none rounded-2xl px-4 py-4 pl-12 text-sm font-semibold text-gray-700 outline-none cursor-pointer" 
+                                    required data-input>
+                                <i class="fas fa-calendar-alt absolute left-4 top-1/2 -translate-y-1/2 text-violet-500 transition-colors pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-save-settings" class="btn-primary w-full py-5 rounded-[22px] shadow-lg shadow-indigo-100 flex items-center justify-center gap-3 font-bold">
+                        <i class="fas fa-save"></i> บันทึกการตั้งค่า
+                    </button>
+                </form>
+
+                <div class="modern-card p-6 border-l-[6px] border-amber-400 bg-white rounded-[28px] shadow-sm mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-sm">ความคืบหน้าการส่งข้อจำกัด</h3>
+                            <p class="text-[11px] text-gray-400 progress-text">กำลังโหลดข้อมูล...</p>
+                        </div>
+                        <div class="text-right">
+                            <span id="submission-percent" class="progress-percent text-2xl font-black text-amber-500">0%</span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                        <div id="submission-bar" class="bg-amber-400 h-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                    </div>
+                </div>
+
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">เมนูจัดการ</h3>
+                
+                <a href="constraint_settings.html" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-violet-200 transition-all duration-200">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-violet-50 rounded-full flex items-center justify-center text-violet-600"><i class="fas fa-user-clock text-lg"></i></div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-gray-700">ส่งข้อจำกัด (ส่วนตัว)</h4>
+                                <span id="my-constraint-status" class="px-2 py-1 rounded bg-gray-100 text-gray-400 text-xs font-bold">รอตรวจสอบ...</span>
+                            </div>
+                            <p class="text-[10px] text-gray-400">สำหรับหัวหน้าพยาบาล</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </a>
+
+                <a href="nurse_list.html" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><i class="fas fa-users text-lg"></i></div>
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-700">รายชื่อพยาบาล</h4>
+                            <p class="text-[10px] text-gray-400">จัดการข้อมูลบุคลากร</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </a>
+
+                <a href="admin-import.html" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600"><i class="fas fa-file-excel text-lg"></i></div>
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-700">นำเข้าข้อมูล (Excel)</h4>
+                            <p class="text-[10px] text-gray-400">อัปโหลดไฟล์รายชื่อพยาบาล</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </a>
+
+                <div onclick="openPasswordModal()" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between group hover:border-amber-200 transition-all cursor-pointer">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-600"><i class="fas fa-key text-lg"></i></div>
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-700">เปลี่ยนรหัสผ่าน</h4>
+                            <p class="text-[10px] text-gray-400">แก้ไขรหัสผ่านส่วนตัว</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-300"></i>
+                </div>
+            </div>
+
+            <div id="generate-section" class="space-y-4">
+                <a href="generate_schedule.html" id="btn-generate-real" class="hidden bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white p-5 rounded-2xl shadow-lg flex items-center justify-between group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center"><i class="fas fa-wand-magic-sparkles text-xl"></i></div>
+                        <div><h4 class="font-bold text-lg">สร้างตารางเวร</h4><p class="text-xs text-fuchsia-100">ข้อมูลครบถ้วน พร้อมประมวลผล</p></div>
+                    </div>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                
+                <div id="btn-generate-locked" class="bg-white border-2 border-dashed border-gray-200 p-5 rounded-2xl flex items-center justify-between text-gray-400">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center"><i class="fas fa-lock"></i></div>
+                        <div><h4 class="font-bold text-lg text-gray-500">ระบบยังไม่พร้อมจัดเวร</h4><p class="text-xs">รอปิดรับข้อมูล</p></div>
+                    </div>
+                </div>
+
+                <a href="manage-schedule.html" class="flex items-center p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-fuchsia-500 transition-all">
+                    <div class="w-12 h-12 bg-fuchsia-100 text-fuchsia-600 rounded-xl flex items-center justify-center mr-4">
+                        <i class="fas fa-edit text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800">จัดการตารางรายวัน</h3>
+                        <p class="text-xs text-gray-400">แก้ไขหรือเติมพยาบาลในกะที่ว่าง</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+<script>
+    // ตรวจสอบ Base URL ของ API
+    const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'https://autoshift-backend.onrender.com';
+    
+    // --- [จุดที่ 1: ต้องมีตัวแปรเก็บข้อมูลแยกประเภทวัน] ---
+    let currentDayType = 'weekday'; 
+    let allQuotas = {
+        weekday: { morning: 0, afternoon: 0, night: 0 },
+        weekend: { morning: 0, afternoon: 0, night: 0 },
+        holiday: { morning: 0, afternoon: 0, night: 0 }
+    };
+    let selectedStatus = 'Closed';
+    let allConstraints = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        checkHeadNurseRole();
+        setupCalendar();
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        try {
+            await loadAllData(); 
+            setTimeout(() => {
+                updateConstraintStatus();
+                fetchPendingCounts();
+                updateMyOwnConstraintStatus();
+            }, 300);
+        } catch (err) {
+            console.error("Dashboard Initial Load Error:", err);
+        }
+
+        const settingsForm = document.getElementById('scheduleSettingsForm');
+        if(settingsForm) {
+            settingsForm.addEventListener('submit', saveSettings);
+        }
+    });
+
+    // --- [จุดที่ 2: ต้องเพิ่มฟังก์ชันสลับ Tab เพื่อให้เลขไม่หาย] ---
+    function switchDayType(type) {
+        // 1. ดึงค่าจากหน้าจอมาตรวจสอบก่อน
+        const m = document.getElementById('quotaMorning').value;
+        const a = document.getElementById('quotaAfternoon').value;
+        const n = document.getElementById('quotaNight').value;
+
+        // 2. "เซฟ" ลงหน่วยความจำ เฉพาะเมื่อมีค่าที่ถูกต้อง (ไม่ใช่ช่องว่าง หรือ 0 ทั้งหมด)
+        // เพื่อป้องกันจังหวะโหลดหน้าจอแล้วเอาค่าว่างไปทับ data จริง
+        if (m !== "" || a !== "" || n !== "") {
+            allQuotas[currentDayType] = {
+                morning: m || 0,
+                afternoon: a || 0,
+                night: n || 0
+            };
+        }
+
+        currentDayType = type;
+
+        // 3. ปรับสีปุ่ม Tab
+        ['weekday', 'weekend', 'holiday'].forEach(t => {
+            const btn = document.getElementById(`tab-${t}`);
+            if (btn) {
+                btn.className = (t === type) 
+                    ? 'flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-white shadow-sm text-violet-600' 
+                    : 'flex-1 py-2 text-xs font-bold rounded-lg transition-all text-gray-500';
+            }
+        });
+
+        // 4. เปลี่ยนหัวข้อ Label
+        const labels = {
+            weekday: 'จำนวนพยาบาลต่อเวร (วันจันทร์-ศุกร์)',
+            weekend: 'จำนวนพยาบาลต่อเวร (เสาร์-อาทิตย์)',
+            holiday: 'จำนวนพยาบาลต่อเวร (วันหยุดนักขัตฤกษ์)'
+        };
+        document.getElementById('quota-label').innerText = labels[type];
+
+        // 5. ดึงค่าจากหน่วยความจำมาโชว์ที่ช่อง Input (ใช้ค่าที่มีอยู่จริง)
+        document.getElementById('quotaMorning').value = allQuotas[type].morning;
+        document.getElementById('quotaAfternoon').value = allQuotas[type].afternoon;
+        document.getElementById('quotaNight').value = allQuotas[type].night;
+    }
+
+  async function loadAllData() {
+    const token = localStorage.getItem('token');
+    try {
+        const [setRes, statRes] = await Promise.all([
+            fetch(`${API_URL}/api/admin/get-settings`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/api/check-constraint-window`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        const settings = await setRes.json();
+        
+        if (settings.success && settings.settings) {
+            const s = settings.settings;
+            selectedStatus = s.SystemStatus || 'Closed';
+
+            // 1. ตรวจสอบสถานะจาก Database (ดึงมาเป็นตัวแปรพักไว้ก่อน)
+            let isSystemOpen = s.SystemStatus === 'Open'; 
+            
+            // 2. [ส่วนที่แก้ไข] ตรวจสอบ Deadline (เปิด-ปิดอัตโนมัติ)
+            if (s.deadline) {
+                const now = moment();
+                const deadlineDate = moment(s.deadline).endOf('day');
+                
+                // ถ้าวันนี้ "เลย" วัน Deadline ไปแล้ว
+                if (now.isAfter(deadlineDate)){
+                    if (isSystemOpen) {
+                        // ถ้าใน DB ยังเป็น Open ให้สั่งปิดอัตโนมัติ
+                        await autoCloseSystem(); 
+                        return; // ออกจากฟังก์ชันเพื่อรอโหลดใหม่จาก autoCloseSystem()
+                    } else {
+                        // ถ้าเป็น Closed อยู่แล้ว ก็ให้ตัวแปรสถานะเป็นเท็จ
+                        isSystemOpen = false;
+                    }
+                }
+            }
+
+            // 3. จัดการ Quota Data (ส่วนนี้คงเดิม)
+            const parseQuota = (data) => {
+                if (!data) return { morning: 0, afternoon: 0, night: 0 };
+                let parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                return {
+                    morning: parseInt(parsed.morning) || 0,
+                    afternoon: parseInt(parsed.afternoon) || 0,
+                    night: parseInt(parsed.night) || 0
+                };
+            };
+
+            allQuotas.weekday = parseQuota(s.weekdayQuotas);
+            allQuotas.weekend = parseQuota(s.weekendQuotas);
+            allQuotas.holiday = parseQuota(s.holidayQuotas);
+
+            // แสดงผล Quota ปัจจุบัน
+            const current = allQuotas[currentDayType];
+            document.getElementById('quotaMorning').value = current.morning;
+            document.getElementById('quotaAfternoon').value = current.afternoon;
+            document.getElementById('quotaNight').value = current.night;
+
+            if (s.deadline) {
+                document.getElementById('deadlineDate')._flatpickr.setDate(s.deadline);
+            }
+
+            // 4. [จุดสำคัญที่สุด] สั่งให้ UI แสดงผลตามสถานะที่เช็คแล้ว
+            // ถ้าเลย Deadline มาแล้ว isSystemOpen จะเป็น false ปุ่มจัดเวรจะโผล่เอง
+            togglePeriod(isSystemOpen ? 'Open' : 'Closed');
+        }
+
+    } catch (e) { 
+        console.error("Load Data Error:", e); 
+    }
+}
+    async function autoCloseSystem() {
+        const token = localStorage.getItem('token');
+        try {
+            await fetch(`${API_URL}/api/admin/toggle-window`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ status: 'Closed' }) 
+            });
+            // หลังจากสั่งปิดที่ Server แล้ว ให้โหลดข้อมูลใหม่เพื่อ Update UI ทันที
+            await loadAllData();
+        } catch (e) {
+            console.error("Auto Close Error:", e);
+        }
+    }
+
+    // ฟังก์ชันใหม่สำหรับคุมการ Lock ทุกอย่างบนหน้าจอ
+    function syncLockStatus(isOpen) {
+        const btnOpen = document.getElementById('btn-open');
+        const btnClosed = document.getElementById('btn-closed');
+        const btnSave = document.getElementById('btn-save-settings');
+        const statusText = document.getElementById('period-status-text');
+        const btnReal = document.getElementById('btn-generate-real');
+        const btnLock = document.getElementById('btn-generate-locked');
+        const quotaInputs = document.querySelectorAll('.stat-input');
+
+        if (isOpen) {
+            // --- [OPEN]: ล็อกการแก้ไข ---
+            if (btnOpen) btnOpen.className = 'toggle-btn toggle-active-open';
+            if (btnClosed) btnClosed.className = 'toggle-btn toggle-inactive';
+            if (statusText) statusText.innerText = "ขณะนี้ระบบเปิดอยู่ (ล็อกการแก้ไขโควต้า)";
+
+            btnSave.disabled = true;
+            btnSave.style.background = "#94a3b8"; 
+            btnSave.innerHTML = '<i class="fas fa-lock"></i> ระบบเปิดอยู่ (แก้ไขไม่ได้)';
+            
+            quotaInputs.forEach(input => {
+                input.readOnly = true;
+                input.style.backgroundColor = "#f3f4f6"; // เพิ่มสีพื้นหลังเทาให้ชัดเจน
+            });
+
+            if (btnReal) btnReal.classList.add('hidden');
+            if (btnLock) btnLock.classList.remove('hidden');
+
+        } else {
+            // --- [CLOSED]: แก้โควต้าได้ + ปุ่มจัดเวรเผยขึ้นมา ---
+            if (btnOpen) btnOpen.className = 'toggle-btn toggle-inactive';
+            if (btnClosed) btnClosed.className = 'toggle-btn toggle-active-closed';
+            if (statusText) statusText.innerText = "ระบบปิดแล้ว (คุณสามารถแก้ไขโควต้าและเริ่มจัดเวรได้)";
+
+            btnSave.disabled = false;
+            btnSave.style.background = ""; // กลับเป็นม่วง Gradient ตาม CSS
+            btnSave.innerHTML = '<i class="fas fa-save"></i> บันทึกการตั้งค่าใหม่';
+            
+            quotaInputs.forEach(input => {
+                input.readOnly = false;
+                input.style.backgroundColor = "#ffffff"; // สีขาวเพื่อให้รู้ว่าพิมพ์ได้
+            });
+
+            if (btnReal) btnReal.classList.remove('hidden');
+            if (btnLock) btnLock.classList.add('hidden');
+        }
+    }
+    async function saveSettings(e) {
+        if (e) e.preventDefault();
+        const token = localStorage.getItem('token');
+        
+        // อัปเดตข้อมูลกะปัจจุบันเข้า memory ก่อนส่ง
+        allQuotas[currentDayType] = {
+            morning: parseInt(document.getElementById('quotaMorning').value) || 0,
+            afternoon: parseInt(document.getElementById('quotaAfternoon').value) || 0,
+            night: parseInt(document.getElementById('quotaNight').value) || 0
+        };
+
+        const payload = {
+            weekdayQuotas: allQuotas.weekday,
+            weekendQuotas: allQuotas.weekend,
+            holidayQuotas: allQuotas.holiday,
+            deadline: document.getElementById('deadlineDate').value,
+            status:  'Open'// ค่า 'Open' หรือ 'Closed' จากการกด Toggle
+        };
+
+        Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+        try {
+            const res = await fetch(`${API_URL}/api/admin/save-settings`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                // --- จุดที่แก้ไข: ใช้สถานะล่าสุดที่บันทึกสำเร็จในการ Update UI ---
+                // สมมติว่า payload.status คือค่าที่เราเพิ่งส่งไป
+                const isNowOpen = (payload.status === 'Open');
+                
+                // เรียกฟังก์ชันคุม UI
+                syncLockStatus(isNowOpen); 
+
+                await Swal.fire({ 
+                    icon: 'success', 
+                    title: 'บันทึกสำเร็จ', 
+                    text: isNowOpen ? 'ระบบเปิดรับข้อมูลแล้ว (ล็อกการแก้ไข)' : 'ระบบปิดแล้ว (เริ่มจัดเวรได้)',
+                    timer: 2000 
+                });
+
+                // โหลดข้อมูลใหม่เพื่อความแม่นยำ
+                await loadAllData(); 
+            } else {
+                throw new Error(data.message || 'บันทึกไม่สำเร็จ');
+            }
+        } catch (err) {
+            console.error("Save Error:", err);
+            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.message });
+        }
+    }
+    // --- [ฟังก์ชันอื่นๆ คงเดิมตามที่คุณเขียนไว้ได้เลยครับ] ---
+    function togglePeriod(status) {
+        selectedStatus = status; // <--- บรรทัดนี้จะเอาค่า 'Open' หรือ 'Closed' ไปใส่ในกล่องที่เราประกาศไว้
+        const isOpen = (status === 'Open');
+        const btnOpen = document.getElementById('btn-open');
+        const btnClosed = document.getElementById('btn-closed');
+        
+        btnOpen.className = isOpen ? 'toggle-btn toggle-active-open' : 'toggle-btn toggle-inactive';
+        btnClosed.className = !isOpen ? 'toggle-btn toggle-active-closed' : 'toggle-btn toggle-inactive';
+
+        const statusText = document.getElementById('period-status-text');
+        statusText.innerText = isOpen 
+            ? "คุณเลือก: เปิดรับข้อมูล (จะบันทึกเมื่อกดปุ่มด้านล่าง)" 
+            : "คุณเลือก: ปิดรับข้อมูล (จะบันทึกเมื่อกดปุ่มด้านล่าง)";
+
+        syncLockStatus(isOpen); 
+    }
+
+    function updatePeriodUI(isOpen) {
+        const btnOpen = document.getElementById('btn-open');
+        const btnClosed = document.getElementById('btn-closed');
+        const statusText = document.getElementById('period-status-text');
+        const btnReal = document.getElementById('btn-generate-real');
+        const btnLock = document.getElementById('btn-generate-locked');
+
+        if(btnOpen && btnClosed) {
+            btnOpen.className = isOpen ? 'toggle-btn toggle-active-open' : 'toggle-btn toggle-inactive';
+            btnClosed.className = !isOpen ? 'toggle-btn toggle-active-closed' : 'toggle-btn toggle-inactive';
+        }
+        
+        if(statusText) statusText.innerText = isOpen ? "ขณะนี้ระบบเปิดรับข้อจำกัด" : "ระบบปิดรับข้อจำกัดแล้ว";
+
+        // จัดการปุ่มสร้างตารางเวร (Open = Lock | Closed = Show)
+        if (btnReal && btnLock) {
+            btnReal.classList.toggle('hidden', isOpen);
+            btnLock.classList.toggle('hidden', !isOpen);
+        }
+    }
+
+    async function fetchPendingCounts() {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/pending-counts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('pending-swap-count').innerText = data.swapCount || 0;
+                document.getElementById('pending-trade-count').innerText = data.tradeCount || 0;
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    async function updateConstraintStatus() {
+        try {
+            const res = await fetch(`${API_URL}/api/constraint-status`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            const data = await res.json();
+            if (data.success) {
+                document.querySelector('.progress-text').innerText = `ส่งแล้ว ${data.submitted} / ${data.total} คน`;
+                const percent = Math.round((data.submitted / data.total) * 100) || 0;
+                document.getElementById('submission-percent').innerText = `${percent}%`;
+                document.getElementById('submission-bar').style.width = `${percent}%`;
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    async function updateMyOwnConstraintStatus() {
+        try {
+            const res = await fetch(`${API_URL}/api/my-constraint-status`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            const data = await res.json();
+            const statusEl = document.getElementById('my-constraint-status');
+            if (statusEl && data.status) {
+                statusEl.innerText = data.status;
+                if(data.status === 'ส่งแล้ว') {
+                    statusEl.classList.replace('bg-gray-100', 'bg-green-100');
+                    statusEl.classList.replace('text-gray-400', 'text-green-600');
+                }
+            }
+        } catch (err) { console.error(err); }
+    }
+
+   function setupCalendar() {
+    flatpickr("#deadlineDate", { 
+        locale: "th", 
+        dateFormat: "Y-m-d",
+        altInput: true, 
+        altFormat: "j F Y", 
+        // ก๊อปปี้ Class ทั้งหมดจาก Input เดิมมาใส่ที่ตัวโชว์ด้วย
+        altInputClass: "w-full bg-gray-50 border-none rounded-2xl px-4 py-4 pl-12 text-sm font-semibold text-gray-700 outline-none cursor-pointer",
+        disableMobile: true, 
+        static: false, 
+        position: "auto" 
+    });
+}
+
+    async function openPasswordModal() {
+        // --- ส่วน Password Modal ของคุณทำงานได้ดีอยู่แล้ว สามารถคงเดิมไว้ได้เลยครับ ---
+    }
+
+    async function savePasswordToDB(payload) {
+        Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        try {
+            const res = await fetch(`${API_URL}/api/change-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ ...payload, currentSocketId: window.socket ? window.socket.id : null })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (data.token) localStorage.setItem('token', data.token);
+                await Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ!', timer: 2500 });
+            } else { throw new Error(data.message); }
+        } catch (err) { Swal.fire({ icon: 'error', title: 'ล้มเหลว', text: err.message }); }
+    }
+
+    function checkHeadNurseRole() {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.RoleID !== 1) window.location.href = 'login.html';
+    }
+</script>
+</body>
+</html>

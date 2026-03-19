@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTONURSESHIFT - แก้ไขข้อจำกัดเวร</title>
+    
+    <link href="./style.css" rel="stylesheet"> 
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="lib/flatpickr.css">
+    
+    <script src="lib/sweetalert2.js"></script>
+    <script src="lib/moment.js"></script> 
+    <script src="lib/flatpickr.js"></script>
+    <script src="lib/th.js"></script> 
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof moment !== 'undefined') moment.locale('th');
+            if (typeof flatpickr !== 'undefined' && flatpickr.l10ns.th) flatpickr.localize(flatpickr.l10ns.th);
+        });
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    
+    <app-header></app-header>
+
+    <div class="max-w-screen-md mx-auto px-4 md:px-6 pt-24 pb-32 space-y-8">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-indigo-700">⚙️ ตั้งค่าข้อจำกัดเวร</h1>
+            <p class="text-slate-500 mt-2">ระบุความต้องการส่วนตัวเพื่อช่วยให้ระบบจัดเวรได้เหมาะสมที่สุด</p>
+        </header>
+
+        <div id="loading-overlay" class="fixed inset-0 bg-white/80 z-50 flex items-center justify-center hidden">
+            <div class="text-center">
+                <i class="fas fa-circle-notch fa-spin text-4xl text-indigo-600 mb-3"></i>
+                <p class="text-indigo-600 font-medium">กำลังโหลดข้อมูลเก่า...</p>
+            </div>
+        </div>
+
+        <section class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
+            <h2 class="text-xl font-semibold mb-4 text-slate-700">📅 รอบการตั้งค่าและวันหยุด</h2>
+            <div class="space-y-4">
+                
+                <p class="text-sm text-indigo-600 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                    <i class="fas fa-info-circle mr-2"></i> ข้อมูลนี้ใช้สำหรับการจัดเวร **รอบเดือนถัดไป**
+                </p>
+
+                <div>
+                    <label class="text-sm font-medium text-slate-600 block mb-2">รอบการจัดเวรที่กำลังตั้งค่า:</label>
+                    <p id="setting-period-display" class="font-bold text-lg text-indigo-700">กำลังคำนวณรอบ...</p>
+                </div>
+                <div class="mt-2">
+                    <p id="constraint-deadline" class="text-red-600 font-semibold">
+                        กำลังโหลดกำหนดส่งข้อมูล...
+                    </p>
+                </div>
+
+                <hr class="border-slate-100">
+                
+                <div>
+                    <label for="desired-days-off" class="text-sm font-medium text-slate-600 block mb-2">จำนวนวันที่ต้องการหยุด (Days Off)</label>
+                    <div class="flex items-center gap-3">
+                        <input type="number" id="desired-days-off" value="4" min="0" max="10" class="w-20 border-2 border-gray-100 rounded-xl p-3 text-sm text-center font-bold focus:border-indigo-500 transition outline-none">
+                        <span class="text-slate-500">วัน/รอบ</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">จำนวนวันหยุดที่ต้องการขั้นต่ำในรอบจัดเวรนี้ (ไม่เกิน 10 วัน)</p>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <div>
+                    <label class="text-sm font-medium text-slate-600 block mb-3">วันที่ไม่สะดวก (ห้ามจัดเวร)</label>
+                    <div class="flex gap-2">
+                        <div class="flex-grow">
+                            <app-date-picker 
+                                placeholder="เลือกวันที่หยุดแน่นอน" 
+                                input-id="fixed-days-off-picker"
+                                data-mode="multiple"
+                            ></app-date-picker>
+                        </div>
+                        <button type="button" id="clear-calendar-btn" class="px-3 py-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-red-50 hover:text-red-500 transition border border-slate-200">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">เลือกวันที่คุณไม่สามารถมาทำงานได้แน่นอน (ห้ามเกินโควตาข้างบน)</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
+            <h2 class="text-xl font-semibold mb-4 text-slate-700">⭐ กะที่ต้องการ/ไม่ต้องการ (Preference)</h2>
+            <p class="text-sm text-slate-400 mb-4 border-b pb-3 border-slate-100">
+                โปรดให้คะแนนความต้องการกะ (1: ไม่ต้องการทำเลย, 5: ต้องการทำมากที่สุด)
+            </p>
+            <div class="grid grid-cols-3 gap-4">
+                <div id="pref-Morning-input"></div>
+                <div id="pref-Afternoon-input"></div>
+                <div id="pref-Night-input"></div>
+            </div>
+        </section>
+
+        <footer class="pt-4 pb-8">
+            <button id="save-constraints-btn" class="w-full bg-indigo-600 text-white text-lg font-semibold py-3 rounded-2xl shadow-lg shadow-indigo-300 hover:bg-indigo-700 transition-all duration-300 transform active:scale-95">
+                <i class="fas fa-save mr-2"></i> บันทึกและส่งข้อจำกัด
+            </button>
+        </footer>
+
+    </div>
+
+    <app-navbar></app-navbar>
+
+<script>
+    const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'https://autoshift-backend.onrender.com';
+
+    function ShiftPreferenceInput(shiftId, label) {
+        let colorClass = shiftId.includes('Morning') ? 'text-blue-600' : (shiftId.includes('Afternoon') ? 'text-orange-600' : 'text-purple-600');
+        return `
+            <div class="text-center p-3 rounded-xl border-2 border-slate-200 bg-white shadow-sm hover:border-indigo-400 transition">
+                <p class="text-sm font-bold mb-2 ${colorClass}">${label}</p>
+                <input type="number" id="pref-${shiftId}" value="3" min="1" max="5" class="w-full border-2 border-gray-100 rounded-lg p-3 text-center text-xl font-bold focus:border-indigo-500 transition outline-none">
+                <div class="mt-2 text-xs text-slate-400">ระดับ (1-5)</div>
+            </div>
+        `;
+    }
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. ตรวจสอบสิทธิ์
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || ![1, 2].includes(user.RoleID)) {
+             window.location.href = 'login.html';
+             return;
+        }
+
+        // 2. Render UI
+        document.getElementById('pref-Morning-input').innerHTML = ShiftPreferenceInput('Morning', 'กะเช้า');
+        document.getElementById('pref-Afternoon-input').innerHTML = ShiftPreferenceInput('Afternoon', 'กะบ่าย');
+        document.getElementById('pref-Night-input').innerHTML = ShiftPreferenceInput('Night', 'กะดึก');
+        
+        // 3. คำนวณรอบเดือนถัดไป (Setting Period)
+        const periodDisplay = document.getElementById('setting-period-display');
+        let settingPeriodStart = '';
+        if (typeof moment !== 'undefined') {
+            const nextMonthStart = moment().add(1, 'month').startOf('month');
+            const nextMonthEnd = moment().add(1, 'month').endOf('month');
+            periodDisplay.innerText = `รอบวันที่ ${nextMonthStart.format('D')} - ${nextMonthEnd.format('D MMMM YYYY')}`;
+            settingPeriodStart = nextMonthStart.format('YYYY-MM-DD');
+        }
+
+        // 4. สร้างปฏิทิน
+        let fp; 
+        setTimeout(() => {
+            const limitInput = document.getElementById('desired-days-off');
+            const pickerInput = document.getElementById('fixed-days-off-picker');
+            const clearBtn = document.getElementById('clear-calendar-btn');
+
+            if (pickerInput) {
+                if (pickerInput._flatpickr) pickerInput._flatpickr.destroy();
+                fp = flatpickr(pickerInput, {
+                    mode: "multiple",
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "j F Y",
+                    locale: "th",
+                    conjunction: ", ",
+                    onChange: function(selectedDates, dateStr, instance) {
+                        const maxDays = parseInt(limitInput.value) || 0;
+                        if (selectedDates.length > maxDays) {
+                            const allowedDates = selectedDates.slice(0, maxDays);
+                            instance.setDate(allowedDates, false);
+                            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'เกินโควตา!', text: `เลือกได้สูงสุด ${maxDays} วัน`, showConfirmButton: false, timer: 3000 });
+                        }
+                    }
+                });
+
+                limitInput.addEventListener('change', () => {
+                    const maxDays = parseInt(limitInput.value) || 0;
+                    if (fp.selectedDates.length > maxDays) {
+                        const allowedDates = fp.selectedDates.slice(0, maxDays);
+                        fp.setDate(allowedDates, false);
+                    }
+                });
+
+                if (clearBtn) clearBtn.addEventListener('click', () => fp.clear());
+            }
+        }, 500);
+
+        // ✅ 5. ตรวจสอบสถานะระบบ (ก่อนจะให้โหลดข้อมูล)
+        await checkSystemStatus();
+
+        // ✅ 6. ดึงข้อมูลเก่ามาแสดง (ถ้าเคยส่งแล้ว)
+        // รอแป๊บนึงเพื่อให้ปฏิทินสร้างเสร็จก่อนค่อยเติมค่า
+        setTimeout(() => {
+            loadExistingData(settingPeriodStart);
+        }, 800);
+
+        // --- ฟังก์ชันย่อย ---
+
+       async function checkSystemStatus() {
+            try {
+                const res = await apiRequest(`${API_URL}/api/check-constraint-window`);
+                const data = await res.json();
+
+                const deadlineEl = document.getElementById('constraint-deadline');
+
+                if (data.deadline && typeof moment !== 'undefined') {
+                    const formatted = moment(data.deadline, "YYYY-MM-DD")
+                    .locale('th')
+                    .format('D MMMM YYYY HH:mm');
+                    deadlineEl.innerText = `⏰ ส่งข้อมูลได้ถึง: ${formatted} (หลังจากนี้จะปิดรับข้อมูล)`;
+                } else {
+                    deadlineEl.innerText = '⚠️ ยังไม่ได้ตั้งกำหนดส่ง';
+                }
+
+                if (!data.isOpen) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'ปิดรับข้อมูลแล้ว',
+                        text: 'เลยกำหนดส่งข้อมูลสำหรับรอบนี้แล้ว ไม่สามารถแก้ไขได้',
+                        allowOutsideClick: false,
+                        confirmButtonText: 'กลับหน้าหลัก'
+                    }).then(() => {
+                        window.location.href = user.RoleID === 1 ? 'Headnurse_dashboard.html' : 'dashboard.html';
+                    });
+
+                    document.getElementById('save-constraints-btn').disabled = true;
+                    document.getElementById('save-constraints-btn').classList.add('bg-gray-400');
+                }
+
+            } catch (err) {
+                console.error("Check Status Error", err);
+            }
+        }
+        async function loadExistingData(period) {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const saveBtn = document.getElementById('save-constraints-btn');
+
+            try {
+                if (loadingOverlay) loadingOverlay.classList.remove('hidden'); 
+                
+                const res = await apiRequest(`${API_URL}/api/get-my-constraints?period=${period}`);
+                if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลได้');
+                const response = await res.json();
+
+                if (response.success && response.data) {
+                    const d = response.data;
+                    console.log("Found existing data:", d);
+
+                    // 1. เติมข้อมูลลงฟอร์ม (ใส่ || '' เพื่อกัน undefined)
+                    const fields = {
+                        'desired-days-off': d.DaysOffMin,
+                        'pref-Morning': d.PrefMorning,    // 💡 เช็ค ID ใน HTML อีกครั้ง
+                        'pref-Afternoon': d.PrefAfternoon,
+                        'pref-Night': d.PrefNight
+                    };
+
+                    for (const [id, value] of Object.entries(fields)) {
+                        const el = document.getElementById(id);
+                        if (el && value !== undefined) el.value = value;
+                    }
+
+                    // 2. เติมวันที่ในปฏิทิน Flatpickr
+                    if (d.FixedDaysOff) {
+                        try {
+                            let dates = [];
+                            if (Array.isArray(d.FixedDaysOff)) {
+                                dates = d.FixedDaysOff;
+                            } else if (typeof d.FixedDaysOff === 'string') {
+                                const trimmed = d.FixedDaysOff.trim();
+                                if (trimmed.startsWith('[')) {
+                                    dates = JSON.parse(trimmed);
+                                } else if (trimmed.length > 0) {
+                                    dates = trimmed.split(',').map(s => s.trim());
+                                }
+                            }
+
+                            const pickerEl = document.getElementById('fixed-days-off-picker');
+                            const picker = pickerEl ? pickerEl._flatpickr : null;
+                            if (picker) {
+                                picker.setDate(dates, true); // true เพื่อ trigger change event
+                            }
+                        } catch (e) { 
+                            console.error("Date processing error:", e); 
+                        }
+                    }
+
+                    // 3. เปลี่ยนสถานะปุ่ม (Update UI)
+                    if (saveBtn) {
+                        saveBtn.innerHTML = '<i class="fas fa-edit mr-2"></i> อัปเดตข้อมูลเดิม';
+                        saveBtn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+                        saveBtn.classList.add('hover:bg-emerald-700');
+                    }
+                    
+                    Swal.fire({
+                        toast: true, position: 'top-end', icon: 'info', 
+                        title: 'โหลดข้อมูลเดิมแล้ว', text: 'ตรวจสอบความถูกต้องก่อนกดบันทึก', 
+                        timer: 2500, showConfirmButton: false
+                    });
+                }
+            } catch (err) {
+                console.error("Load Data Error:", err);
+                // เลือกแสดงผลเฉพาะกรณีที่พังจริงๆ ไม่ใช่แค่หาข้อมูลไม่เจอ
+            } finally {
+                if (loadingOverlay) loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        // ปุ่มบันทึก (Logic เดิม)
+        const saveBtn = document.getElementById('save-constraints-btn');
+        saveBtn.addEventListener('click', async () => {
+            const daysOff = parseInt(document.getElementById('desired-days-off').value) || 0;
+            const fixedDaysOffString = document.getElementById('fixed-days-off-picker').value;
+            
+            const preferences = {
+                Morning: parseInt(document.getElementById('pref-Morning').value) || 3,
+                Afternoon: parseInt(document.getElementById('pref-Afternoon').value) || 3,
+                Night: parseInt(document.getElementById('pref-Night').value) || 3,
+            };
+
+            if (daysOff < 0 || daysOff > 10) {
+                  Swal.fire('แจ้งเตือน', 'จำนวนวันหยุดต้องอยู่ระหว่าง 0-10 วัน', 'warning');
+                  return;
+            }
+            
+            const payload = {
+                userId: user.UserID,
+                settingPeriod: settingPeriodStart,
+                daysOffMinimum: daysOff,
+                fixedDaysOff: fixedDaysOffString ? fixedDaysOffString.split(',').map(d => d.trim()).filter(d => d) : [], 
+                preferences: preferences,
+                reason: "User Preference"
+            };
+
+            try {
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+                saveBtn.disabled = true;
+
+                const res = await apiRequest(`${API_URL}/api/set-constraints`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                
+                if (res.ok && result.success) {
+                    Swal.fire({
+                        title: 'สำเร็จ!', text: 'บันทึกข้อมูลเรียบร้อยแล้ว', icon: 'success', confirmButtonText: 'ตกลง'
+                    }).then(() => {
+                        window.location.href = user.RoleID === 1 ? 'Headnurse_dashboard.html' : 'dashboard.html';
+                    });
+                } else {
+                    throw new Error(result.message || 'บันทึกไม่สำเร็จ');
+                }
+            } catch (e) {
+                console.error(e);
+                Swal.fire('ข้อผิดพลาด', e.message, 'error');
+                saveBtn.innerHTML = '<i class="fas fa-save mr-2"></i> บันทึกและส่งข้อจำกัด';
+                saveBtn.disabled = false;
+            }
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AUTONURSESHIFT - หน้าหลัก</title>
+    
+    <link href="./style.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f8fafc; 
+            /* อย่าลืมเช็คว่ารูป background06.png อยู่ใน folder frontend ด้วยนะครับ */
+            background-image: url('background06.png'); 
+            background-size: cover; 
+            background-attachment: fixed; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+        .animate-enter { animation: floatUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        .interactive-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .interactive-card { transition: all 0.3s; }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+<div class="flex flex-col h-screen relative overflow-hidden">
+
+<app-header></app-header>
+
+    <main class="flex-1 overflow-y-auto overflow-x-hidden pb-32 scroll-smooth">
+        <div class="max-w-screen-md mx-auto p-4 md:p-6 space-y-6">
+
+            <div class="animate-enter bg-white rounded-3xl shadow-sm p-6 border border-slate-100 interactive-card relative overflow-hidden">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-indigo-50 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
+                    <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm shadow-inner"><i class="fas fa-clock"></i></span>
+                    เวรที่กำลังจะมาถึง
+                </h2>
+                <div id="upcoming-shift-container" class="space-y-3 relative z-10">
+                    <div class="animate-pulse flex space-x-4 p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
+                        <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="stats-grid" class="grid grid-cols-2 gap-4"></div>
+
+            <div class="animate-enter delay-300 relative rounded-3xl shadow-lg shadow-indigo-200 overflow-hidden interactive-card">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
+                <div class="relative p-7 text-white">
+                    <h2 class="text-xl font-bold mb-2">จัดการเวรของคุณ</h2>
+                    <div class="flex flex-wrap gap-3 mt-4">
+                        <a href="schedule.html" class="flex-1 bg-white/10 backdrop-blur-md border border-white/20 text-white text-center py-2.5 rounded-xl hover:bg-white hover:text-indigo-600 transition-all">
+                            <i class="fas fa-calendar-alt mr-1"></i> ตารางเวร
+                        </a>
+                        <a href="swap_request.html" class="flex-1 bg-white text-indigo-600 text-center font-bold py-2.5 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
+                            ขอแลกเวร <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animate-enter delay-500 mt-4">
+                <h3 class="text-sm font-bold text-black uppercase tracking-wider mb-3 ml-1">บัญชีผู้ใช้</h3>
+                
+                <div onclick="openPasswordModal()" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer hover:border-amber-200 group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-700 group-hover:text-amber-600 transition-colors">เปลี่ยนรหัสผ่าน</div>
+                            <div class="text-xs text-slate-400">แก้ไขรหัสผ่านเพื่อความปลอดภัย</div>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-slate-300 group-hover:text-amber-500 transition-colors"></i>
+                </div>
+            </div>
+
+
+        </div>
+    </main>
+
+    <button id="constraintBtn" class="hidden fixed bottom-24 right-5 w-14 h-14 bg-rose-500 text-white rounded-full shadow-lg flex items-center justify-center z-40 animate-enter"><i class="fas fa-calendar-times text-xl"></i></button>
+
+    <app-navbar></app-navbar>
+    <div id="passwordModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4" style="z-index: 9999;">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl transform scale-95 transition-transform duration-300" id="passwordModalContent">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fas fa-shield-alt text-amber-500"></i> เปลี่ยนรหัสผ่าน
+                </h3>
+                <button type="button" onclick="closePasswordModal()" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="changePasswordForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัสผ่านเดิม</label>
+                    <div class="relative">
+                        <input type="password" id="oldPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none transition-all pr-10" placeholder="ระบุรหัสปัจจุบัน" required>
+                        <i class="fas fa-eye absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 toggle-password cursor-pointer hover:text-amber-500 transition-colors"></i>
+                    </div>
+                    <p id="old-pass-msg" class="text-[10px] mt-1 h-4 flex items-center gap-1"></p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">รหัสผ่านใหม่</label>
+                    <div class="relative">
+                        <input type="password" id="newPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none transition-all pr-10" placeholder="ตั้งรหัสใหม่" required>
+                        <i class="fas fa-eye absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 toggle-password cursor-pointer hover:text-amber-500 transition-colors"></i>
+                    </div>
+                    <p id="new-pass-error" class="text-[10px] mt-1 text-red-500 hidden"><i class="fas fa-times-circle"></i> ห้ามซ้ำกับรหัสเดิม</p>
+                    
+                    <div class="validation-box mt-2">
+                        <ul>
+                            <li id="rule-length"><i class="fas fa-circle text-[8px]"></i> 8 ตัวอักษรขึ้นไป</li>
+                            <li id="rule-upper"><i class="fas fa-circle text-[8px]"></i> ตัวพิมพ์ใหญ่ (A-Z)</li>
+                            <li id="rule-lower"><i class="fas fa-circle text-[8px]"></i> ตัวพิมพ์เล็ก (a-z)</li>
+                            <li id="rule-number"><i class="fas fa-circle text-[8px]"></i> ตัวเลข (0-9)</li>
+                            <li id="rule-special"><i class="fas fa-circle text-[8px]"></i> อักขระพิเศษ (!@#$%)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">ยืนยันรหัสผ่านใหม่</label>
+                    <div class="relative">
+                        <input type="password" id="confirmPassword" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-100 outline-none transition-all pr-10" placeholder="ระบุอีกครั้ง" required>
+                        <i class="fas fa-eye absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 toggle-password cursor-pointer hover:text-amber-500 transition-colors"></i>
+                    </div>
+                    <p id="match-error" class="text-[10px] mt-1 text-red-500 hidden"><i class="fas fa-times-circle"></i> รหัสผ่านไม่ตรงกัน</p>
+                </div>
+
+                <div class="pt-4 flex gap-3">
+                    <button type="button" onclick="closePasswordModal()" class="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors">ยกเลิก</button>
+                    <button type="submit" id="btn-submit-pass" disabled class="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600 shadow-lg shadow-amber-200 transition-all active:scale-95">
+                        บันทึก
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+
+<script>
+
+
+// Logic หน้า Dashboard
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. ตั้งค่า Moment.js เป็นภาษาไทย
+    if (window.moment) {
+        moment.locale('th');
+    }
+
+    // 2. Auth Check
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token'); 
+
+    if (!storedUser || !token) {
+        window.location.href = 'login.html';
+        return;
+    }
+    const currentUser = JSON.parse(storedUser);
+    if (currentUser.RoleID !== 2) {
+        alert('หน้านี้สำหรับพยาบาลเท่านั้น');
+        window.location.href = 'login.html'; 
+        return; 
+    }
+
+    // 3. [เพิ่มใหม่] Socket Force Logout Listener
+    // ทำหน้าที่รับสัญญาณจาก Server กรณีมีการเปลี่ยนรหัสผ่านจากเครื่องอื่น
+    if (window.socket) {
+        window.socket.on('force_logout', () => {
+            Swal.fire({
+                icon: 'warning',
+                title: 'เซสชันหมดอายุ',
+                text: 'รหัสผ่านของคุณถูกเปลี่ยนจากอุปกรณ์อื่น เพื่อความปลอดภัยกรุณาเข้าสู่ระบบใหม่',
+                confirmButtonColor: '#4f46e5',
+                allowOutsideClick: false,
+                customClass: { popup: 'rounded-3xl' }
+            }).then(() => {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            });
+        });
+    }
+
+    // 4. เรียกฟังก์ชันทำงานเดิม
+    renderStatsGrid();
+    loadDashboardData();
+    checkConstraintWindow();
+
+    const constraintBtn = document.getElementById('constraintBtn');
+    if (constraintBtn) {
+        constraintBtn.addEventListener('click', () => {
+            window.location.href = 'constraint_settings.html'; 
+        });
+    }
+});
+
+
+// --- HELPER COMPONENTS ---
+
+const ShiftCard = (shift, index) => {
+    // Logic สี Theme ตามกะ
+    let theme = shift.ShiftName.includes('บ่าย') ? 'border-l-orange-500' : (shift.ShiftName.includes('ดึก') ? 'border-l-purple-500' : 'border-l-blue-500');
+    let icon = shift.ShiftName.includes('บ่าย') ? 'fa-cloud-sun text-orange-500' : (shift.ShiftName.includes('ดึก') ? 'fa-moon text-purple-500' : 'fa-sun text-blue-500');
+    
+    return `
+        <div class="flex justify-between items-center p-3.5 rounded-xl border border-slate-100 ${theme} bg-white shadow-sm animate-enter" style="animation-delay: ${index * 150}ms">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center"><i class="fas ${icon}"></i></div>
+                <div>
+                    <div class="font-bold text-slate-700">${shift.ShiftName}</div>
+                    <div class="text-xs text-slate-400">${moment(shift.Nurse_Date).format('D MMM')} | ${shift.StartTime?.slice(0,5)}-${shift.EndTime?.slice(0,5)}</div>
+                </div>
+            </div>
+            <div class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">${shift.WardName || '-'}</div>
+        </div>`;
+};
+
+const StatCard = ({ id, label, gradient }) => `
+    <div class="animate-enter bg-white rounded-3xl shadow-sm p-5 text-center border border-slate-100 interactive-card">
+        <div class="text-3xl font-extrabold text-transparent bg-clip-text ${gradient}" id="${id}">-</div>
+        <p class="text-xs text-slate-400 mt-2 uppercase">${label}</p>
+    </div>
+`;
+
+function renderStatsGrid() {
+    const stats = [
+        { id: 'total-month', label: 'เวรเดือนนี้', gradient: 'bg-gradient-to-br from-indigo-500 to-indigo-700' },
+        { id: 'total-week', label: 'เวรสัปดาห์นี้', gradient: 'bg-gradient-to-br from-blue-400 to-blue-600' },
+        { id: 'pending-exchange', label: 'รอแลกเปลี่ยน', gradient: 'bg-gradient-to-br from-amber-400 to-orange-500' },
+        { id: 'pending-trade', label: 'รออนุมัติขาย', gradient: 'bg-gradient-to-br from-rose-400 to-red-600' }
+    ];
+    document.getElementById('stats-grid').innerHTML = stats.map(StatCard).join('');
+}
+
+// --- API FUNCTIONS ---
+
+async function loadDashboardData() {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token');
+
+    try {
+        const res = await apiRequest(`${API_BASE}/api/dashboard-summary`, {
+            method: 'POST',
+            body: JSON.stringify({ userId: user.UserID })
+        });
+
+        if (res.status === 401) {
+            console.error("Token expired");
+            window.location.href = 'login.html';
+            return;
+        }
+
+        const data = await res.json();
+        
+        if (data.success) {
+            // Update ตัวเลขสถิติ
+            ['totalMonth', 'totalWeek', 'pendingExchange', 'pendingTrade'].forEach(k => {
+                const el = document.getElementById(k.replace(/([A-Z])/g, '-$1').toLowerCase());
+                if(el) el.innerText = data.stats[k];
+            });
+
+            // Update การ์ดเวร
+            const container = document.getElementById('upcoming-shift-container');
+            if (data.upcomingShifts?.length) {
+                container.innerHTML = data.upcomingShifts.map((s, i) => ShiftCard(s, i)).join('');
+            } else {
+                container.innerHTML = `<div class="text-center py-6 text-slate-400 text-sm">ไม่มีเวรเร็วๆ นี้</div>`;
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function checkConstraintWindow() {
+    const token = localStorage.getItem('token');
+    try {
+        const res = await apiRequest(`${API_BASE}/api/check-constraint-window`);
+        if (res.status === 401) return;
+
+        const data = await res.json();
+        const btn = document.getElementById('constraintBtn');
+        if (data.isOpen) btn.classList.remove('hidden');
+    } catch {}
+}
+// ==========================================
+//  ✅ PASSWORD MODAL LOGIC (FIXED)
+// ==========================================
+const oldPassInput = document.getElementById('oldPassword');
+const oldPassMsg = document.getElementById('old-pass-msg');
+const newPassInput = document.getElementById('newPassword');
+const confirmPassInput = document.getElementById('confirmPassword');
+const submitBtn = document.getElementById('btn-submit-pass');
+const newPassError = document.getElementById('new-pass-error');
+const matchError = document.getElementById('match-error');
+
+const rules = {
+    length: { el: document.getElementById('rule-length'), regex: /.{8,}/ },
+    upper: { el: document.getElementById('rule-upper'), regex: /[A-Z]/ },
+    lower: { el: document.getElementById('rule-lower'), regex: /[a-z]/ },
+    number: { el: document.getElementById('rule-number'), regex: /[0-9]/ },
+    special: { el: document.getElementById('rule-special'), regex: /[!@#$%^&*._-]/ }
+};
+
+// 1. ฟังก์ชันเปิด Modal
+function openPasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    const content = document.getElementById('passwordModalContent');
+    
+    document.getElementById('changePasswordForm').reset();
+    resetValidationUI();
+    
+    // Clear styles
+    oldPassInput.classList.remove('valid-pass', 'invalid-pass');
+    oldPassMsg.innerHTML = '';
+    newPassError.classList.add('hidden');
+    matchError.classList.add('hidden');
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-95');
+        content.classList.add('scale-100');
+    }, 10);
+}
+
+// 2. ฟังก์ชันปิด Modal
+function closePasswordModal() {
+    const modal = document.getElementById('passwordModal');
+    const content = document.getElementById('passwordModalContent');
+    
+    modal.classList.add('opacity-0');
+    content.classList.remove('scale-100');
+    content.classList.add('scale-95');
+    setTimeout(() => document.getElementById('passwordModal').classList.add('hidden'), 300);
+}
+
+function resetValidationUI() {
+    Object.values(rules).forEach(r => { r.el.classList.remove('valid'); r.el.querySelector('i').className = 'fas fa-circle text-[8px]'; });
+    confirmPassInput.classList.remove('mismatch');
+    newPassInput.classList.remove('mismatch');
+    submitBtn.disabled = true;
+}
+
+function updateRuleStatus(element, isValid) {
+    const icon = element.querySelector('i');
+    if (isValid) {
+        element.classList.add('valid');
+        icon.className = 'fas fa-check-circle text-[10px]';
+    } else {
+        element.classList.remove('valid');
+        icon.className = 'fas fa-circle text-[8px]';
+    }
+}
+
+// 3. ตรวจสอบรหัสเดิม (Real-time)
+// 3. ตรวจสอบรหัสเดิม (Real-time เมื่อเลิกโฟกัสที่ช่องกรอก)
+oldPassInput.addEventListener('blur', async () => {
+    const password = oldPassInput.value;
+    if (password.length === 0) return;
+
+    try {
+        const res = await apiRequest(`${API_BASE}/api/check-old-password`, {
+            method: 'POST',
+            body: JSON.stringify({ oldPassword: password })
+        });
+
+        // ตรวจสอบว่า API มีอยู่จริงหรือไม่ (ป้องกัน Error 404 ที่เป็น HTML)
+        if (!res.ok) {
+            throw new Error('ไม่สามารถเชื่อมต่อระบบตรวจสอบได้');
+        }
+
+        const data = await res.json();
+        
+        if (data.valid) {
+            // ✅ รหัสถูกต้อง
+            oldPassInput.classList.remove('invalid-pass'); 
+            oldPassInput.classList.add('valid-pass');
+            oldPassMsg.innerHTML = '<span class="text-green-600 font-medium"><i class="fas fa-check-circle"></i> รหัสผ่านปัจจุบันถูกต้อง</span>';
+            validateNewPassword(); // เรียกตรวจเงื่อนไขรหัสใหม่ต่อ
+        } else {
+            // ❌ รหัสไม่ถูกต้อง
+            oldPassInput.classList.remove('valid-pass'); 
+            oldPassInput.classList.add('invalid-pass');
+            oldPassMsg.innerHTML = '<span class="text-red-500 font-medium"><i class="fas fa-times-circle"></i> รหัสผ่านปัจจุบันไม่ถูกต้อง</span>';
+            submitBtn.disabled = true;
+        }
+    } catch (err) { 
+        console.error("Check old password error:", err);
+        oldPassMsg.innerHTML = '<span class="text-amber-500 text-[10px]">ระบบตรวจสอบขัดข้องชั่วคราว</span>';
+    }
+});
+
+oldPassInput.addEventListener('input', () => { oldPassInput.classList.remove('valid-pass', 'invalid-pass'); oldPassMsg.innerHTML = ''; submitBtn.disabled = true; });
+
+// 4. ตรวจสอบรหัสใหม่ (Validation + Match + Duplicate)
+function validateNewPassword() {
+    const val = newPassInput.value;
+    const confirmVal = confirmPassInput.value;
+    const oldVal = oldPassInput.value;
+    let allPassed = true;
+
+    // Check Rules
+    for (const key in rules) {
+        const passed = rules[key].regex.test(val);
+        updateRuleStatus(rules[key].el, passed); // ✅ เรียกใช้ฟังก์ชันอัปเดต UI
+        if (!passed) allPassed = false;
+    }
+
+    // Check Duplicate Old
+    if (val === oldVal && val.length > 0) {
+        newPassInput.classList.add('mismatch');
+        newPassError.classList.remove('hidden');
+        allPassed = false;
+    } else {
+        newPassInput.classList.remove('mismatch');
+        newPassError.classList.add('hidden');
+    }
+
+    // Check Match
+    let match = false;
+    if (confirmVal.length > 0) {
+        if (val !== confirmVal) {
+            confirmPassInput.classList.add('mismatch');
+            matchError.classList.remove('hidden');
+        } else {
+            confirmPassInput.classList.remove('mismatch');
+            matchError.classList.add('hidden');
+            match = true;
+        }
+    } else {
+        matchError.classList.add('hidden');
+    }
+
+    // Enable Button
+    submitBtn.disabled = !(allPassed && match && oldPassInput.classList.contains('valid-pass') && val !== oldVal);
+}
+
+newPassInput.addEventListener('input', validateNewPassword);
+confirmPassInput.addEventListener('input', validateNewPassword);
+
+// 5. Toggle Eye Icon
+document.querySelectorAll('.toggle-password').forEach(icon => {
+    icon.addEventListener('click', function() {
+        const input = this.previousElementSibling;
+        const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+        input.setAttribute('type', type);
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
+});
+
+// 6. Submit Form
+// 6. Submit Form
+document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+
+    try {
+        const res = await apiRequest(`${API_BASE}/api/change-password`, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                oldPassword: oldPassInput.value, 
+                newPassword: newPassInput.value,
+                currentSocketId: window.socket ? window.socket.id : null 
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            // ✅ [จุดที่ต้องเพิ่ม]: อัปเดต Token ใหม่ในเครื่องทันที
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+            }
+
+            await Swal.fire({ 
+                icon: 'success', 
+                title: 'สำเร็จ!', 
+                text: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว (เครื่องอื่นถูกออกจากระบบ)', 
+                timer: 2000, 
+                showConfirmButton: false 
+            });
+            closePasswordModal();
+        } else { 
+            throw new Error(data.message); 
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: err.message });
+        submitBtn.disabled = false; 
+        submitBtn.innerHTML = 'บันทึก';
+    }
+});
+
+// Close Modal on Background Click
+document.getElementById('passwordModal').addEventListener('click', (e) => {
+    if (e.target.id === 'passwordModal') closePasswordModal();
+});
+</script>
+
+</body>
+</html>

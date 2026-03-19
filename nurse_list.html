@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการรายชื่อพยาบาล - AutoNurseShift</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background: #f8faff;
+            background-image: radial-gradient(#e0e7ff 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Table Styling */
+        .modern-table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0 12px; 
+            table-layout: fixed; /* ล็อคความกว้างคอลัมน์ */
+        }
+
+        /* กำหนดความกว้างแต่ละคอลัมน์ให้หัวและตัวตรงกัน */
+        .col-staff { width: 40%; }
+        .col-role { width: 20%; }
+        .col-status { width: 25%; }
+        .col-action { width: 15%; }
+
+        .modern-table thead th { 
+            font-weight: 500; 
+            color: #6b7280; 
+            text-transform: uppercase; 
+            font-size: 0.75rem; 
+            letter-spacing: 0.05em;
+            padding: 0 16px 8px 16px;
+        }
+
+        .modern-table tbody tr {
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            border-radius: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .modern-table tbody tr:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+
+        .modern-table td { 
+            padding: 16px; 
+            vertical-align: middle; 
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .modern-table td:first-child { border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
+        .modern-table td:last-child { border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden text-gray-800">
+
+    <app-header></app-header>
+
+    <main class="flex-1 overflow-y-auto pb-32 px-4 md:px-8 pt-6">
+        <div class="max-w-7xl mx-auto space-y-8">
+            
+            <div class="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                        <span class="w-2 h-8 bg-violet-600 rounded-full inline-block"></span>
+                        รายชื่อบุคลากร
+                    </h1>
+                    <p class="text-gray-500 mt-1 ml-5">จัดการข้อมูลและสถานะการลาพักของพยาบาลทุกระดับ</p>
+                </div>
+                
+                <a href="admin-import.html" class="inline-flex items-center gap-2 px-6 py-3 font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-all shadow-lg shadow-violet-100">
+                    <i class="fa-solid fa-file-excel"></i> Import ข้อมูลใหม่
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div>
+                    <div><p class="text-sm text-gray-400 font-medium">พยาบาลทั้งหมด</p><h3 class="text-2xl font-bold" id="stat-total">0</h3></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-nurse"></i></div>
+                    <div><p class="text-sm text-gray-400 font-medium">ปฏิบัติงานปกติ</p><h3 class="text-2xl font-bold" id="stat-active">0</h3></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-user-slash"></i></div>
+                    <div><p class="text-sm text-gray-400 font-medium">ลาพักงาน/Inactive</p><h3 class="text-2xl font-bold" id="stat-inactive">0</h3></div>
+                </div>
+            </div>
+
+            <div class="relative max-w-lg">
+                <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="searchInput" onkeyup="filterTable()" 
+                    class="block w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-violet-500 focus:ring-4 focus:ring-violet-50 transition outline-none"
+                    placeholder="ค้นหาชื่อ หรืออีเมล...">
+            </div>
+
+            <div class="overflow-x-auto pb-4">
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th class="col-staff text-left">บุคลากร</th>
+                            <th class="col-role text-left">ตำแหน่ง</th>
+                            <th class="col-status text-left">สถานะระบบ</th>
+                            <th class="col-action text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        <tr>
+                            <td colspan="4" class="text-center py-12 text-gray-400">
+                                <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลดข้อมูล...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+    <script>
+        const API_BASE_URL = 'https://autoshift-backend.onrender.com'; 
+
+        async function fetchUsers() {
+            const token = localStorage.getItem('token'); 
+            if (!token) { window.location.href = 'login.html'; return; }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/all-users`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStats(data.users);
+                    renderTable(data.users);
+                }
+            } catch (err) {
+                Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            }
+        }
+
+        function renderTable(users) {
+            const tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center p-8 text-gray-400">ไม่พบข้อมูล</td></tr>`;
+                return;
+            }
+
+            users.forEach(user => {
+                const isInactive = user.Status === 'inactive';
+                const profileImg = user.ProfileImage || `https://ui-avatars.com/api/?name=${user.FirstName}+${user.LastName}&background=random&color=fff`;
+
+                const tr = document.createElement('tr');
+                tr.className = isInactive ? 'opacity-60 grayscale-[50%]' : '';
+                
+                tr.innerHTML = `
+                    <td class="col-staff">
+                        <div class="flex items-center gap-4">
+                            <img src="${profileImg}" class="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm">
+                            <div class="truncate">
+                                <div class="font-semibold text-gray-800 text-sm md:text-base">${user.FirstName} ${user.LastName}</div>
+                                <div class="text-xs text-gray-400 font-light">${user.Email}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="col-role">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${user.RoleID === 1 ? 'bg-violet-100 text-violet-700' : 'bg-blue-50 text-blue-600'}">
+                            ${user.RoleID === 1 ? 'HEAD NURSE' : 'STAFF NURSE'}
+                        </span>
+                    </td>
+                    <td class="col-status">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${isInactive ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}"></span>
+                            <span class="text-xs font-medium ${isInactive ? 'text-rose-500' : 'text-emerald-600'}">
+                                ${isInactive ? 'ลาพัก/Inactive' : 'ปฏิบัติงานปกติ'}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="col-action text-center">
+                        <button onclick="toggleUserStatus(${user.UserID}, '${user.Status}', '${user.FirstName}')" 
+                            class="inline-flex w-9 h-9 items-center justify-center rounded-xl transition-all ${isInactive ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-rose-50 text-rose-500 hover:bg-rose-100'}"
+                            title="${isInactive ? 'เรียกกลับมาทำงาน' : 'ให้ลาพักงาน'}">
+                            <i class="fa-solid ${isInactive ? 'fa-rotate-left' : 'fa-power-off'}"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function toggleUserStatus(userId, currentStatus, userName) {
+            const isCurrentlyActive = currentStatus === 'active';
+            const newStatus = isCurrentlyActive ? 'inactive' : 'active';
+            
+            const result = await Swal.fire({
+                title: isCurrentlyActive ? 'ยืนยันการให้ลาพัก?' : 'เรียกกลับมาทำงาน?',
+                html: `ต้องการเปลี่ยนสถานะของ <b>${userName}</b> หรือไม่?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: isCurrentlyActive ? '#e11d48' : '#10b981',
+                confirmButtonText: 'ยืนยันดำเนินการ',
+                cancelButtonText: 'ยกเลิก',
+                customClass: { popup: 'rounded-2xl' }
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_BASE_URL}/api/admin/update-user-status`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ targetUserId: userId, newStatus: newStatus })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        Swal.fire({ icon: 'success', title: 'สำเร็จ', text: 'อัปเดตสถานะเรียบร้อย', timer: 1500, showConfirmButton: false });
+                        fetchUsers(); 
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                } catch (err) {
+                    Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error');
+                }
+            }
+        }
+
+        function updateStats(users) {
+            document.getElementById('stat-total').innerText = users.length;
+            document.getElementById('stat-active').innerText = users.filter(u => u.Status === 'active').length;
+            document.getElementById('stat-inactive').innerText = users.filter(u => u.Status === 'inactive').length;
+        }
+
+        function filterTable() {
+            const filter = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.getElementById('userTableBody').getElementsByTagName('tr');
+            for (let row of rows) {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', fetchUsers);
+    </script>
+</body>
+</html>

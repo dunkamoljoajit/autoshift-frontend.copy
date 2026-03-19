@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>การแจ้งเตือน - AutoNurseShift</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <script src="components.js"></script> 
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
+        .card-enter { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .clickable-card { cursor: pointer; transition: all 0.2s ease; position: relative; border-left-width: 4px !important; }
+        .clickable-card:hover { transform: translateY(-2px); background-color: #f1f5f9; border-color: #6366f1; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .clickable-card:active { transform: scale(0.98); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <app-header class="fixed top-0 left-0 w-full z-50 shadow-sm bg-white"></app-header>
+
+    <main class="pt-32 md:pt-44 max-w-2xl mx-auto px-4 py-6">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">การแจ้งเตือน</h1>
+                <p class="text-slate-500 text-sm mt-1" id="page-subtitle">รายการอัปเดตทั้งหมดของคุณ</p>
+            </div>
+            <div class="bg-indigo-50 p-2.5 rounded-2xl">
+                <i class="fas fa-bell text-indigo-600 text-xl"></i>
+            </div>
+        </div>
+
+        <div class="mb-6 overflow-x-auto no-scrollbar">
+            <div class="flex gap-2 min-w-max pb-2">
+                <button onclick="filterNoti('all')" class="filter-btn active px-5 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-md">ทั้งหมด</button>
+                <button onclick="filterNoti('trade')" class="filter-btn px-5 py-2 rounded-xl text-xs font-bold transition-all bg-white border border-slate-200 text-slate-600 shadow-sm">💰 การซื้อขาย</button>
+                <button onclick="filterNoti('swap')" class="filter-btn px-5 py-2 rounded-xl text-xs font-bold transition-all bg-white border border-slate-200 text-slate-600 shadow-sm">🔄 การแลกเวร</button>
+                <button onclick="filterNoti('system')" class="filter-btn px-5 py-2 rounded-xl text-xs font-bold transition-all bg-white border border-slate-200 text-slate-600 shadow-sm">📢 ระบบ</button>
+            </div>
+        </div>
+
+        <div id="notificationList" class="space-y-4 min-h-[300px]"></div>
+
+        <div id="loading" class="hidden flex flex-col items-center py-20">
+            <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <span class="text-slate-400 text-xs">กำลังดึงข้อมูล..</span>
+        </div>
+        
+        <div id="emptyState" class="hidden flex flex-col items-center py-24 text-center">
+            <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-check-circle text-3xl text-slate-200"></i>
+            </div>
+            <h3 class="text-slate-600 font-bold">ไม่มีรายการใหม่</h3>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+    <script>
+        const API_URL = (typeof API_BASE !== 'undefined') ? API_BASE : 'https://autoshift-backend.onrender.com';
+        let currentUser = null;
+        let allNotifications = [];
+        let isFetching = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            moment.locale('th'); 
+            const userStr = localStorage.getItem('user');
+            if (!userStr) { window.location.href = 'login.html'; return; }
+            currentUser = JSON.parse(userStr);
+            
+            if (currentUser.RoleID === 1) {
+                document.getElementById('page-subtitle').innerText = 'รายการรออนุมัติและการแจ้งเตือนระบบ';
+                await fetchAdminPendingActions(); 
+            }
+            
+            await loadNotifications();
+            markAllAsRead(); 
+            
+            if (typeof initSocketNotificationSystem === 'function') {
+                initSocketNotificationSystem();
+            }
+        });
+
+        async function loadNotifications() {
+            if (isFetching) return; 
+            isFetching = true;
+            const loader = document.getElementById('loading');
+            const token = localStorage.getItem('token');
+            if (loader) loader.classList.remove('hidden');
+
+            try {
+                const res = await apiRequest(`${API_URL}/api/notifications/all/${currentUser.UserID}`);
+                const data = await res.json();
+                if (data.success) {
+                    allNotifications = data.notifications;
+                    renderList(allNotifications);
+                }
+            } catch (err) { 
+                console.error("Load Notifications Error:", err);
+            } finally {
+                isFetching = false;
+                if (loader) loader.classList.add('hidden');
+            }
+        }
+        function handleSafeRedirect(element) {
+            const info = decodeURIComponent(element.getAttribute('data-info'));
+            handleActionRedirect(info);
+        }
+
+        async function markAllAsRead() {
+            const token = localStorage.getItem('token');
+            try {
+                await fetch(`${API_URL}/api/notifications/mark-all-read`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, 
+                    body: JSON.stringify({ userId: currentUser.UserID }) 
+                });
+            } catch(err) {
+                console.error("Mark Read Error:", err);
+            }
+        }
+
+       function renderList(data) {
+            const list = document.getElementById('notificationList');
+            const empty = document.getElementById('emptyState');
+            if (!list) return;
+
+            const adminCards = Array.from(list.querySelectorAll('[id^="admin-card-"]'));
+            list.innerHTML = '';
+            adminCards.forEach(card => list.appendChild(card));
+            
+            if ((!data || data.length === 0) && adminCards.length === 0) { 
+                if (empty) empty.classList.remove('hidden'); 
+                return; 
+            }
+            if (empty) empty.classList.add('hidden');
+
+            data.forEach((noti, index) => {
+                let info = noti.info || '';
+                const title = noti.Title || 'แจ้งเตือน';
+                
+                const longDateRegex = /[A-Z][a-z]{2}\s[A-Z][a-z]{2}\s\d{2}\s\d{4}/g;
+                info = info.replace(longDateRegex, (match) => moment(match).add(543, 'years').format('D MMM YY'));
+                info = info.replace(/00:00:00 GMT\+0700 \(Indochina Time\)/g, '');
+
+                const isSuccess = info.includes('สำเร็จ') || info.includes('เรียบร้อย') || info.includes('อนุมัติแล้ว');
+                const isWaitingHeadNurse = info.includes('รอหัวหน้าอนุมัติ');
+                const isActionable = (info.includes('รอ') || info.includes('ขอ')) && !isSuccess && !isWaitingHeadNurse;
+                
+                let theme = { icon: 'fa-bell', color: 'text-blue-500', bg: 'bg-blue-50' };
+                if (info.includes('ซื้อ') || info.includes('ขาย')) theme = { icon: 'fa-money-bill-wave', color: 'text-emerald-500', bg: 'bg-emerald-50' };
+                if (info.includes('แลก') || info.includes('สลับ')) theme = { icon: 'fa-sync-alt', color: 'text-orange-500', bg: 'bg-orange-50' };
+                if (isSuccess) theme.icon = 'fa-check-circle';
+
+                // --- จุดที่แก้ไข: ห่อข้อความไว้ให้ปลอดภัย ---
+                const encodedInfo = encodeURIComponent(noti.info || '');
+
+                const html = `
+                <div class="card-enter bg-white rounded-2xl border p-4 shadow-sm mb-4 ${isActionable ? 'clickable-card border-indigo-500 bg-indigo-50/30' : 'border-slate-100'}" 
+                    style="animation-delay: ${index * 0.05}s"
+                    data-info="${encodedInfo}"
+                    onclick="${isActionable ? 'handleSafeRedirect(this)' : ''}">
+                    <div class="flex gap-4">
+                        <div class="w-12 h-12 rounded-2xl ${theme.bg} flex-shrink-0 flex items-center justify-center shadow-sm">
+                            <i class="fas ${theme.icon} ${theme.color} text-lg"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start mb-1">
+                                <h3 class="font-bold text-slate-800 text-sm truncate">${title}</h3>
+                                <span class="text-[10px] text-slate-400 whitespace-nowrap bg-slate-50 px-2 py-1 rounded-lg">
+                                    ${moment(noti.created_at).fromNow()}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-600 mb-3 leading-relaxed">${info}</p>
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-100/50">
+                                <span class="text-[10px] text-slate-400 font-medium">โดย: ${noti.FirstName || 'ระบบ'}</span>
+                                ${isWaitingHeadNurse ? `
+                                    <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                                        <i class="fas fa-hourglass-half mr-1"></i> รอหัวหน้าพยาบาล
+                                    </span>
+                                ` : isActionable ? `
+                                    <span class="text-[10px] font-bold text-white bg-indigo-600 px-3 py-1 rounded-full shadow-md animate-pulse">ดำเนินการต่อ <i class="fas fa-chevron-right ml-1"></i></span>
+                                ` : `<span class="text-[10px] font-bold ${isSuccess ? 'text-emerald-500' : 'text-slate-300'}">${isSuccess ? 'สำเร็จแล้ว' : 'อ่านแล้ว'}</span>`}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                list.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        async function fetchAdminPendingActions() {
+            const token = localStorage.getItem('token');
+            const container = document.getElementById('notificationList'); 
+            if (!container) return;
+
+            try {
+                const res = await apiRequest(`${API_URL}/api/admin/market/pending`);
+                const data = await res.json();
+                if (data.success && data.results.length > 0) {
+                    const emptyState = document.getElementById('emptyState');
+                    if (emptyState) emptyState.classList.add('hidden');
+                    
+                    data.results.forEach(item => {
+                        const cardHtml = `
+                        <div id="admin-card-${item.TransactionID}" class="bg-white p-5 rounded-2xl border-2 border-indigo-100 shadow-sm mb-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <span class="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">รออนุมัติการซื้อขาย</span>
+                                <small class="text-slate-400 text-xs">${moment(item.CreatedAt).fromNow()}</small>
+                            </div>
+                            <div class="space-y-2 mb-4">
+                                <p class="text-sm text-slate-700"><b>${item.SellerName}</b> ขายเวรให้ <b>${item.BuyerName}</b></p>
+                                <p class="text-xs text-slate-500"><i class="far fa-calendar-alt mr-1"></i> วันที่เวร: ${moment(item.ShiftDate).add(543, 'years').format('ddddที่ D MMM YY')} (${item.ShiftName})</p>
+                            </div>
+                            <div id="admin-actions-${item.TransactionID}" class="flex gap-2">
+                                <button onclick="adminAction(${item.TransactionID}, 'reject')" class="flex-1 px-4 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-bold hover:bg-red-50 transition-all">ปฏิเสธ</button>
+                                <button onclick="adminAction(${item.TransactionID}, 'approve')" class="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-95">อนุมัติการสลับเวร</button>
+                            </div>
+                        </div>`;
+                        container.insertAdjacentHTML('afterbegin', cardHtml);
+                    });
+                }
+            } catch (err) { console.error("Fetch Admin Error:", err); }
+        }
+
+        async function adminAction(transactionId, action) {
+            const token = localStorage.getItem('token');
+            const confirm = await Swal.fire({
+                title: action === 'approve' ? 'ยืนยันการอนุมัติ?' : 'ยืนยันการปฏิเสธ?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'ตกลง',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: action === 'approve' ? '#4f46e5' : '#ef4444'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const res = await apiRequest(`${API_URL}/api/admin/market/action`, {
+                    method: 'POST',
+                    body: JSON.stringify({ transactionId, action, adminId: currentUser.UserID })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const actionContainer = document.getElementById(`admin-actions-${transactionId}`);
+                    if (actionContainer) {
+                        actionContainer.innerHTML = `<div class="w-full text-center py-2 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-xs"><i class="fas fa-check-circle mr-1"></i> ดำเนินการสำเร็จ</div>`;
+                    }
+                    Swal.fire({ icon: 'success', title: 'เรียบร้อย', timer: 1000, showConfirmButton: false });
+                    setTimeout(loadNotifications, 1000);
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            } catch (err) { console.error(err); Swal.fire('Error', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error'); }
+        }
+
+        function handleActionRedirect(info) {
+            // ถ้าข้อความมีคำว่า "แจ้งเตือน" หรือ "ความเสี่ยง" ให้โชว์ Alert เตือนก่อนไปหน้าอื่น
+            if (info.includes('⚠️') || info.includes('เสี่ยง') || info.includes('พักผ่อนน้อย')) {
+                Swal.fire({
+                    title: 'พบความเสี่ยงความล้า',
+                    text: info, // โชว์เหตุผลที่ระบบตรวจพบ
+                    icon: 'warning',
+                    confirmButtonText: 'รับทราบและตรวจสอบ',
+                    confirmButtonColor: '#f59e0b'
+                }).then(() => {
+                    goToRelevantPage(info);
+                });
+            } else {
+                goToRelevantPage(info);
+            }
+        }
+
+        // ฟังก์ชันแยกเพื่อความสะอาดของโค้ด
+        function goToRelevantPage(info) {
+            if (info.includes('ซื้อ') || info.includes('ขาย')) {
+                window.location.href = 'trade_market.html';
+            } else if (info.includes('แลก') || info.includes('สลับ')) {
+                window.location.href = 'swap_request.html'; 
+            }
+        }
+
+        function filterNoti(type) {
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.className = 'filter-btn px-5 py-2 rounded-xl text-xs font-bold transition-all bg-white border border-slate-200 text-slate-600 shadow-sm';
+            });
+            event.target.className = 'filter-btn active px-5 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-md';
+            
+            if (type === 'all') renderList(allNotifications);
+            else {
+                const filtered = allNotifications.filter(n => {
+                    const text = n.info.toLowerCase();
+                    if (type === 'trade') return text.includes('ซื้อ') || text.includes('ขาย');
+                    if (type === 'swap') return text.includes('แลก') || text.includes('สลับ');
+                    if (type === 'system') return !text.includes('ซื้อ') && !text.includes('ขาย') && !text.includes('แลก');
+                    return true;
+                });
+                renderList(filtered);
+            }
+        }
+    </script>
+</body>
+</html>

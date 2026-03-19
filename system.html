@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกี่ยวกับระบบ | AUTONURSESHIFT</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ใช้สไตล์เดียวกับหน้าหลักเพื่อให้ UI สอดคล้องกัน */
+        body { 
+            font-family: "Prompt", sans-serif; 
+            background-color: #f8fbff;
+        }
+        
+        /* Navbar Styles */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 70px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain; 
+        }
+
+        .logo-text {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1e2a78;
+        }
+
+        .menu-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+        .nav-link:hover { color: #1e2a78; }
+        
+        /* กำหนดสีเมนูที่กำลังเลือก */
+        .nav-link.active {
+            color: #1e2a78;
+            border-bottom: 2px solid #1e2a78;
+        }
+
+        .login-btn {
+            background-color: #1e2a78;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 50px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        /* ส่วนหัวสีไล่ระดับ */
+        .gradient-header { 
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+        }
+
+        @media (max-width: 768px) {
+            .nav-link { display: none; }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="navbar">
+        <a href="index.html" class="logo">
+            <img src="logo.png" alt="logo" class="logo-img">
+            <span class="logo-text">AUTONURSESHIFT</span>
+        </a>
+
+        <div class="menu-group">
+            <a href="sytemwork.html" class="nav-link">วิธีการใช้งาน</a>
+            <a href="system.html" class="nav-link active">เกี่ยวกับระบบ</a>
+            <a href="login.html" class="login-btn">เข้าสู่ระบบ</a> 
+        </div>
+    </header>
+
+    <header class="gradient-header text-white py-16 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-4xl font-bold mb-4">เกี่ยวกับระบบ</h1>
+            <p class="text-xl text-blue-100 font-light italic">"Automated Scheduling System for Nursing Shifts"</p>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-12">
+        
+        <div class="mb-8">
+            <a href="index.html" class="inline-flex items-center text-blue-700 hover:text-blue-900 transition font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                ย้อนกลับไปหน้าหลัก
+            </a>
+        </div>
+
+        <section class="mb-16">
+            <div class="flex flex-col md:flex-row gap-8 items-center">
+                <div class="md:w-1/2">
+                    <h2 class="text-2xl font-semibold text-blue-900 mb-4 font-bold">ระบบจัดเวรอัจฉริยะคืออะไร?</h2>
+                    <p class="text-gray-600 leading-relaxed">
+                        ระบบจัดเวรพยาบาลอัตโนมัติที่ขับเคลื่อนด้วย Rule-based Expert System
+                        ออกแบบมาเพื่อช่วยหัวหน้าพยาบาลในการจัดสรรตารางเวรให้มีความยุติธรรมและปลอดภัยที่สุด 
+                        โดยคำนวณจากกฎเกณฑ์ทางสุขภาพและโควตาที่วอร์ดต้องการ นอกจากนี้ยังมีฟีเจอร์ Smart Swap ที่ช่วยให้พยาบาลสามารถแลกเปลี่ยนเวรได้อย่างง่ายดายผ่านระบบออนไลน์
+                        พร้อมการแจ้งเตือนอัตโนมัติผ่านอีเมลทุกครั้งที่มีการเปลี่ยนแปลงตารางเวร
+                    </p>
+                </div>
+                <div class="md:w-1/2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 class="font-semibold text-blue-800 mb-3">เป้าหมายของระบบ</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li class="flex items-start"><span class="text-green-500 mr-2">✔</span> ลดภาระงานของหัวหน้าพยาบาลในการจัดตาราง</li>
+                        <li class="flex items-start"><span class="text-green-500 mr-2">✔</span> ป้องกันความเหนื่อยล้า (Fatigue) ของพยาบาล</li>
+                        <li class="flex items-start"><span class="text-green-500 mr-2">✔</span> เพิ่มความยืดหยุ่นด้วยระบบตลาดซื้อ-ขายและแลกเวร</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        
+
+        <section class="grid md:grid-cols-3 gap-6 mb-16 text-center">
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-800">
+                <div class="text-3xl mb-4">⚖️</div>
+                <h3 class="font-bold mb-2">Safety Logic</h3>
+                <p class="text-sm text-gray-500">ตรวจสอบกฎความปลอดภัยอัตโนมัติ เช่น ห้ามขึ้นเวรดึกต่อเช้า เพื่อสุขภาพของพยาบาล</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-800">
+                <div class="text-3xl mb-4">🤝</div>
+                <h3 class="font-bold mb-2">Smart Swap</h3>
+                <p class="text-sm text-gray-500">ระบบขอแลกเวรแบบ Real-time ผ่าน Socket.io และรอการอนุมัติจากหัวหน้า</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-800">
+                <div class="text-3xl mb-4">📧</div>
+                <h3 class="font-bold mb-2">Auto Notification</h3>
+                <p class="text-sm text-gray-500">แจ้งเตือนผ่าน Email และในแอปทุกครั้งที่มีการเปลี่ยนตารางเวร</p>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+            <div class="bg-gray-800 text-white px-6 py-4 font-semibold">
+                Technical Specifications (Backend Information)
+            </div>
+            <div class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-4 text-sm">
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-500">Timezone Configuration</span>
+                            <span class="font-medium text-blue-700">Asia/Bangkok (GMT+7)</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-500">Security Encryption</span>
+                            <span class="font-medium">Bcrypt.js (10 Rounds)</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4 text-sm">
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-500">SMTP Server</span>
+                            <span class="font-medium">Brevo SMTP Relay (Port 2525)</span>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-gray-500">System Logic</span>
+                            <span class="font-medium italic text-blue-700">Rule-based Expert System</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-16 text-center text-gray-400 text-sm">
+            <p>© 2026 AUTONURSESHIFT Project - พัฒนาเพื่อบุคลากรทางการแพทย์ไทย</p>
+        </footer>
+    </main>
+
+</body>
+</html>

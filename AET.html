@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AUTONURSESHIFT - AEMT Dashboard</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="api-config.js"></script> 
+
+    <style>
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f8fafc; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .animate-enter { animation: floatUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        .interactive-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .interactive-card { transition: all 0.3s; }
+        .glass-morphism { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+<div class="flex flex-col h-screen relative overflow-hidden">
+
+    <header class="bg-white/80 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-50 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
+                <i class="fas fa-ambulance"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-800 leading-none">AUTONURSESHIFT</h1>
+                <span class="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">AEMT Dashboard</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-slate-500" id="user-display-name">กำลังโหลด...</span>
+            <img id="user-avatar" src="" class="w-8 h-8 rounded-full border-2 border-white shadow-sm object-cover">
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto pb-32">
+        <div class="max-w-screen-md mx-auto p-4 md:p-6 space-y-6">
+
+            <div class="animate-enter bg-white rounded-3xl shadow-sm p-6 border border-slate-100 interactive-card relative overflow-hidden">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-indigo-50 rounded-full blur-2xl opacity-60"></div>
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
+                    <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm shadow-inner"><i class="fas fa-clock"></i></span>
+                    ตารางเวรวันนี้
+                </h2>
+                <div id="shift-today" class="relative z-10">
+                    <div class="animate-pulse flex space-x-4">
+                        <div class="rounded-full bg-slate-200 h-12 w-12"></div>
+                        <div class="flex-1 space-y-3 py-1">
+                            <div class="h-2 bg-slate-200 rounded"></div>
+                            <div class="h-2 bg-slate-200 rounded w-5/6"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="animate-enter bg-white rounded-3xl shadow-sm p-5 text-center border border-slate-100 interactive-card">
+                    <div class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-indigo-500 to-indigo-700" id="stat-month-total">0</div>
+                    <p class="text-xs text-slate-400 mt-2 uppercase font-bold">เวรเดือนนี้</p>
+                </div>
+                <div class="animate-enter bg-white rounded-3xl shadow-sm p-5 text-center border border-slate-100 interactive-card">
+                    <div class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-blue-400 to-blue-600" id="stat-hours-total">0</div>
+                    <p class="text-xs text-slate-400 mt-2 uppercase font-bold">ชั่วโมงรวม</p>
+                </div>
+            </div>
+
+            <div class="animate-enter delay-300 relative rounded-3xl shadow-lg shadow-indigo-100 overflow-hidden interactive-card">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
+                <div class="relative p-7 text-white">
+                    <h2 class="text-xl font-bold mb-1">ตรวจสอบรายชื่อ</h2>
+                    <p class="text-white/70 text-xs mb-4">ดูตารางพยาบาลในแผนกเพื่อประสานงาน</p>
+                    <div class="flex gap-3">
+                        <a href="full_schedule.html" class="flex-1 bg-white text-indigo-600 text-center font-bold py-3 rounded-xl shadow-lg transition-all text-sm">
+                            <i class="fas fa-calendar-alt mr-1"></i> ตารางเวรรวม
+                        </a>
+                        <a href="history.html" class="flex-1 bg-white/10 backdrop-blur-md border border-white/20 text-white text-center py-3 rounded-xl transition-all text-sm">
+                            <i class="fas fa-history mr-1"></i> ประวัติงาน
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animate-enter delay-500">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 ml-1">บัญชีผู้ใช้</h3>
+                <div class="space-y-3">
+                    <div onclick="openPasswordModal()" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 cursor-pointer hover:border-indigo-200 group">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 group-hover:scale-110">
+                                <i class="fas fa-key"></i>
+                            </div>
+                            <div class="font-bold text-slate-700">เปลี่ยนรหัสผ่าน</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-slate-300"></i>
+                    </div>
+
+                    <div onclick="logout()" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between active:scale-95 cursor-pointer hover:border-red-200">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center text-rose-500">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </div>
+                            <div class="font-bold text-rose-600">ออกจากระบบ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-100 p-4 flex justify-around items-center z-50">
+        <a href="#" class="flex flex-col items-center gap-1 text-indigo-600">
+            <i class="fas fa-home text-xl"></i>
+            <span class="text-[10px] font-bold">หน้าแรก</span>
+        </a>
+        <a href="full_schedule.html" class="flex flex-col items-center gap-1 text-slate-400">
+            <i class="fas fa-calendar-alt text-xl"></i>
+            <span class="text-[10px] font-bold">ตารางเวร</span>
+        </a>
+        <a href="profile.html" class="flex flex-col items-center gap-1 text-slate-400">
+            <i class="fas fa-user text-xl"></i>
+            <span class="text-[10px] font-bold">โปรไฟล์</span>
+        </a>
+    </nav>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        moment.locale('th');
+        
+        // 1. Auth Check (ระบบจริง)
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        if (!storedUser || !token) {
+            window.location.href = 'login.html';
+            return;
+        }
+        const user = JSON.parse(storedUser);
+
+        // 2. แสดงข้อมูลเบื้องต้นจาก Profile
+        document.getElementById('user-display-name').innerText = `คุณ${user.FirstName} (AEMT)`;
+        document.getElementById('user-avatar').src = user.ProfileImage || 'https://via.placeholder.com/40';
+
+        // 3. โหลดข้อมูลสถิติและเวรจริงจาก API
+        loadAEMTData(user.UserID);
+    });
+
+    async function loadAEMTData(userId) {
+        try {
+            // เรียก API dashboard-summary ที่เราเขียนดัก Role AEMT ไว้ใน Backend
+            const res = await fetch(`${API_BASE}/api/dashboard-summary`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId: userId })
+            });
+
+            const data = await res.json();
+            
+            if (data.success) {
+                // อัปเดตสถิติจริง
+                document.getElementById('stat-month-total').innerText = data.stats.totalMonth;
+                document.getElementById('stat-hours-total').innerText = data.stats.totalMonth * 8;
+                
+                // อัปเดต Card เวร
+                renderRealShift(data.upcomingShifts[0]);
+            }
+        } catch (err) {
+            console.error("API Error:", err);
+            renderRealShift(null);
+        }
+    }
+
+    function renderRealShift(shift) {
+        const container = document.getElementById('shift-today');
+        const today = moment();
+
+        // ตรวจสอบว่าเป็นวันหยุด (ส-อา) หรือไม่พบข้อมูลเวร
+        const isWeekend = today.day() === 0 || today.day() === 6;
+
+        if (isWeekend || !shift) {
+            container.innerHTML = `
+                <div class="flex items-center gap-4 p-4 border border-slate-100 rounded-2xl bg-slate-50/50">
+                    <div class="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xl">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-slate-700">วันนี้วันหยุดพักผ่อน</div>
+                        <div class="text-xs text-slate-400">${today.format('D MMMM YYYY')}</div>
+                    </div>
+                </div>`;
+        } else {
+            container.innerHTML = `
+                <div class="flex justify-between items-center p-4 rounded-2xl border-l-4 border-l-indigo-600 bg-white shadow-sm border border-slate-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 text-xl">
+                            <i class="fas fa-sun"></i>
+                        </div>
+                        <div>
+                            <div class="font-extrabold text-indigo-900">${shift.ShiftName}</div>
+                            <div class="text-xs text-indigo-600 font-medium">${today.format('D MMM')} | ${shift.StartTime.slice(0,5)} - ${shift.EndTime.slice(0,5)} น.</div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">
+                        กำลังปฏิบัติงาน
+                    </div>
+                </div>`;
+        }
+    }
+
+    function logout() {
+        Swal.fire({
+            title: 'ออกจากระบบ?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'ใช่',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#4f46e5',
+            customClass: { popup: 'rounded-3xl' }
+        }).then((res) => {
+            if(res.isConfirmed) {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            }
+        });
+    }
+</script>
+</body>
+</html>

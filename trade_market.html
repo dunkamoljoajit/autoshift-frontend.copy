@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบตลาดขายเวร - AutoNurseShift</title>
+    
+    <link href="./style.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="./lib/flatpickr.css">
+    <script src="./lib/flatpickr.js"></script>
+    <script src="./lib/th.js"></script>
+
+    <link rel="stylesheet" href="./lib/fontawesome/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script> 
+    
+    <style>
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f0f4f8;
+            background-image: url('background06.png'); 
+            background-size: cover; 
+            background-position: center;
+            background-attachment: fixed;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Animation */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-enter { animation: fadeUp 0.4s ease-out forwards; }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Card Hover */
+        .hover-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1); }
+        .transition-all-300 { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @media (min-width: 1024px) {
+            #marketContainer {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+                gap: 1.5rem !important;
+    }
+}
+    </style>
+</head>
+
+<body class="flex flex-col h-screen relative text-slate-800 overflow-hidden">
+
+    <app-header class="sticky top-0 z-30 shadow-sm bg-white/90 backdrop-blur-md border-b border-slate-200"></app-header>
+    
+    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full" style="padding-bottom: 120px !important;">
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 animate-enter">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">ตลาดขายเวร</h1>
+                <p class="text-slate-500 text-sm md:text-base mt-1">ซื้อ-ขายเวรและจัดการเวรของคุณ</p>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <button onclick="reloadData(this)" class="w-10 h-10 md:w-auto md:px-4 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 shadow-sm flex items-center justify-center transition-all">
+                    <i class="fas fa-sync-alt"></i> <span class="hidden md:inline ml-2 text-sm font-medium">รีเฟรช</span>
+                </button>
+                <button onclick="openPostModal()" class="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-200 transition-all transform active:scale-95 flex items-center justify-center gap-2 text-sm font-medium">
+                    <i class="fas fa-plus"></i> ลงประกาศขาย
+                </button>
+            </div>
+        </div>
+
+        <div id="incomingRequestsSection" class="hidden mb-8 animate-enter" style="animation-delay: 0.1s;">
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 md:p-5 shadow-sm">
+                <h2 class="text-base md:text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <span class="flex h-3 w-3 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    มีรายการรอการตอบรับ
+                </h2>
+                <div id="incomingList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div class="mb-8 animate-enter" style="animation-delay: 0.15s;">
+            <h2 class="text-base md:text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                <i class="fas fa-history text-indigo-500"></i> สถานะคำขอ (Transaction)
+            </h2>
+            <div id="myStatusContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full py-8 text-center text-slate-400 bg-white/60 rounded-xl border border-dashed border-slate-300">
+                    <i class="fas fa-spinner fa-spin mr-2"></i> กำลังโหลดข้อมูล...
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 sticky top-0 z-20 md:static py-2 md:py-0 animate-enter" style="animation-delay: 0.2s;">
+            <div class="bg-slate-200/80 p-1 rounded-xl flex w-full md:w-auto backdrop-blur-md">
+                <button onclick="switchTab('market')" id="tab-market" class="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm">
+                    <i class="fas fa-store mr-2"></i> ตลาดกลาง
+                </button>
+                <button onclick="switchTab('my-posts')" id="tab-myposts" class="flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-100">
+                    <i class="fas fa-bullhorn mr-2"></i> ของฉัน
+                </button>
+            </div>
+
+            <div id="filterSection" class="w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar">
+                <div class="flex gap-2 min-w-max">
+                    <button onclick="filterShifts('all')" class="filter-btn active px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-md whitespace-nowrap transition-all">ทั้งหมด</button>
+                    <button onclick="filterShifts('morning')" class="filter-btn px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs font-medium hover:text-indigo-600 hover:border-indigo-300 whitespace-nowrap transition-all">🌞 เช้า</button>
+                    <button onclick="filterShifts('afternoon')" class="filter-btn px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs font-medium hover:text-indigo-600 hover:border-indigo-300 whitespace-nowrap transition-all">⛅ บ่าย</button>
+                    <button onclick="filterShifts('night')" class="filter-btn px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs font-medium hover:text-indigo-600 hover:border-indigo-300 whitespace-nowrap transition-all">🌙 ดึก</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="marketContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-20 animate-enter" style="animation-delay: 0.25s;"></div>
+
+    </main>
+
+    <app-navbar></app-navbar>
+
+</body>
+
+    <div id="postModalOverlay" class="fixed inset-0 bg-slate-900/60 z-[60] hidden backdrop-blur-sm transition-opacity opacity-0 duration-300"></div>
+    <div id="postModal" class="fixed bottom-0 left-0 right-0 md:top-1/2 md:left-1/2 md:bottom-auto md:w-[480px] md:-translate-x-1/2 md:-translate-y-1/2 bg-white z-[70] rounded-t-[2rem] md:rounded-2xl shadow-2xl transform translate-y-full md:translate-y-[20%] transition-transform duration-300 ease-out flex flex-col max-h-[90vh] hidden">
+        
+        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-[2rem] md:rounded-t-2xl sticky top-0 z-10">
+            <div>
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mb-4 md:hidden mx-auto"></div>
+                <h3 class="text-xl font-bold text-slate-800">ลงประกาศขายเวร</h3>
+            </div>
+            <button onclick="closePostModal()" class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto custom-scrollbar">
+            <form id="postShiftForm" onsubmit="submitPost(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">เลือกเวรที่ต้องการขาย</label>
+                    <div class="relative">
+                        <select name="scheduleId" id="shiftSelector" class="w-full pl-10 pr-10 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800 appearance-none text-sm outline-none transition-all" required>
+                            <option value="" disabled selected>กำลังโหลดข้อมูล...</option>
+                        </select>
+                        <i class="far fa-calendar-check absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <i class="fas fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">ราคา / เงื่อนไข</label>
+                    <div class="relative">
+                         <input type="text" name="condition" class="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800 outline-none transition-all" placeholder="เช่น 500 บาท" required>
+                         <i class="fas fa-tag absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">ข้อความเพิ่มเติม (ถ้ามี)</label>
+                    <textarea name="message" rows="3" class="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500 text-slate-800 text-sm outline-none transition-all resize-none" placeholder="รายละเอียดอื่นๆ..."></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold mt-4 shadow-lg shadow-slate-300 hover:bg-slate-800 active:scale-[0.98] transition-all flex justify-center items-center gap-2">
+                    <i class="fas fa-paper-plane text-sm"></i> โพสต์ประกาศ
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let currentUserId = null;
+        let currentTab = 'market';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            moment.locale('th'); // ✅ ตั้งค่าภาษาไทย
+            const userStr = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
+
+            if (!userStr || !token) {
+                alert('กรุณาเข้าสู่ระบบก่อนใช้งาน');
+                window.location.href = 'login.html'; 
+                return;
+            }
+
+            currentUser = JSON.parse(userStr);
+            currentUserId = currentUser.UserID; 
+
+            // --- ส่วนที่เพิ่มเข้าไปใหม่ ---
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetTab = urlParams.get('tab');
+
+            if (targetTab === 'my-posts') {
+                switchTab('my-posts');
+            } else {
+                reloadData();
+            }
+            // -----------------------
+        });
+
+        // ✅ ฟังก์ชันคำนวณเวลาที่ปลอดภัย
+        function safeTimeAgo(dateInput) {
+            const date = moment(dateInput);
+            const now = moment();
+            if (date.isAfter(now) || now.diff(date, 'seconds') < 60) { 
+                return "เมื่อสักครู่"; 
+            }
+            return date.fromNow();
+        }
+
+        async function reloadData(btn) {
+            // --- จุดที่แก้ไข: ตรวจสอบว่า btn ถูกส่งมาและเป็น Element หรือไม่ ---
+            let icon;
+            if (btn && typeof btn.querySelector === 'function') {
+                icon = btn.querySelector('i');
+            } else {
+                // ถ้าเรียก reloadData() แบบไม่ส่งค่า ให้ไปหาปุ่มรีเฟรชในหน้าจอเอง
+                const refreshBtn = document.querySelector('button[onclick*="reloadData"]');
+                if (refreshBtn) icon = refreshBtn.querySelector('i');
+            }
+            
+            if (icon) icon.classList.add('fa-spin');
+            // -------------------------------------------------------
+
+            const statusPromise = fetchMyStatus();
+            const incomingPromise = checkIncomingRequests();
+
+            try {
+                if (currentTab === 'market') {
+                    await fetchMarketData('all');
+                } else {
+                    await fetchMyActivePosts();
+                }
+                await Promise.all([statusPromise, incomingPromise]);
+            } catch (err) {
+                console.error("Refresh Error:", err);
+            } finally {
+                setTimeout(() => {
+                    if (icon) icon.classList.remove('fa-spin');
+                }, 500);
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabMarket = document.getElementById('tab-market');
+            const tabMyPosts = document.getElementById('tab-myposts');
+            const filterSection = document.getElementById('filterSection');
+
+            const activeClass = "flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm";
+            const inactiveClass = "flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700 hover:bg-slate-100";
+
+            if (tab === 'market') {
+                tabMarket.className = activeClass;
+                tabMyPosts.className = inactiveClass;
+                filterSection.classList.remove('hidden');
+                fetchMarketData();
+            } else {
+                tabMyPosts.className = activeClass;
+                tabMarket.className = inactiveClass;
+                filterSection.classList.add('hidden');
+                fetchMyActivePosts();
+            }
+            // ✅ ดึงข้อมูลแจ้งเตือนใหม่ทุกครั้งที่สลับแท็บ
+            fetchMyStatus();
+            checkIncomingRequests();
+        }
+
+        async function fetchMarketData(filterType = 'all') {
+            const token = localStorage.getItem('token');
+            
+            // ปรับ UI ปุ่ม Filter
+            if (currentTab === 'market') {
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.className = 'filter-btn px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs font-medium hover:text-indigo-600 hover:border-indigo-300 whitespace-nowrap transition-all';
+                });
+                const activeBtn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.getAttribute('onclick').includes(filterType));
+                if (activeBtn) {
+                    activeBtn.className = 'filter-btn active px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-md whitespace-nowrap transition-all';
+                }
+            }
+
+            const container = document.getElementById('marketContainer');
+            container.innerHTML = `<div class="col-span-full text-center py-12"><i class="fas fa-circle-notch fa-spin text-3xl text-indigo-300"></i><p class="mt-2 text-slate-400">กำลังดึงข้อมูลตลาด...</p></div>`;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/market/shifts?type=${filterType}&userId=${currentUserId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.status === 401) { 
+                    window.location.href = 'login.html'; 
+                    return; 
+                }
+
+                const data = await response.json(); 
+                container.innerHTML = ''; 
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-20 flex flex-col items-center justify-center opacity-50">
+                            <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                                <i class="fas fa-store-slash text-3xl text-slate-300"></i>
+                            </div>
+                            <span class="text-slate-400 font-medium">ไม่มีรายการขายเวรในขณะนี้</span>
+                        </div>`;
+                    return;
+                }
+
+                data.forEach(shift => {
+                    // ล้างอักขระพิเศษและตัดเรื่องแผนกออก
+                    const userName = (shift.user_name || 'ไม่ระบุชื่อ').replace(/['"]/g, "");
+                    const condition = (shift.condition || 'สอบถามเพิ่มเติม').replace(/['"]/g, "");
+                    
+                    const badgeClass = shift.is_urgent ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                    const badgeIcon = shift.is_urgent ? 'fa-fire-alt' : 'fa-check-circle';
+                    const badgeText = shift.is_urgent ? 'ด่วนมาก' : 'ว่าง';
+
+                    const html = `
+                    <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover-card transition-all-300 relative group cursor-pointer flex flex-col h-full animate-enter">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold border border-indigo-100 text-sm shadow-sm">
+                                    ${userName.charAt(0)}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-slate-800 text-sm line-clamp-1">${userName}</div>
+                                    <div class="text-[10px] text-slate-400">พยาบาลวิชาชีพ</div>
+                                </div>
+                            </div>
+                            <span class="${badgeClass} border px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                <i class="fas ${badgeIcon}"></i> ${badgeText}
+                            </span>
+                        </div>
+                        
+                        <div class="bg-slate-50/80 rounded-xl p-3 mb-4 border border-slate-100/50 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2 text-xs text-slate-700 font-semibold">
+                                    <div class="w-6 h-6 rounded-lg bg-white flex items-center justify-center shadow-sm text-indigo-500">
+                                        <i class="far fa-calendar"></i>
+                                    </div>
+                                    ${moment(shift.shift_date).format('ddddที่ D MMM YY')}
+                                </div>
+                                <div class="text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-100">${safeTimeAgo(shift.created_at)}</div>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-slate-600 font-medium">
+                                <div class="w-6 h-6 rounded-lg bg-white flex items-center justify-center shadow-sm text-orange-500">
+                                    <i class="far fa-clock"></i>
+                                </div>
+                                กะ: <span class="text-slate-800 ml-1">${shift.shift_time_label}</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between gap-3">
+                            <div class="text-indigo-600 font-extrabold text-sm bg-indigo-50/50 px-3 py-2 rounded-xl truncate flex-1 border border-indigo-100/50">
+                                <i class="fas fa-tags text-[10px] mr-1 opacity-70"></i> ${condition}
+                            </div>
+                            <button onclick="requestTrade(${shift.id}, '${userName}')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-100 active:scale-95 flex items-center gap-2">
+                                ซื้อเวร <i class="fas fa-chevron-right text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            } catch (error) {
+                console.error('API Error:', error);
+                container.innerHTML = `<div class="col-span-full text-center py-10 text-slate-500 text-sm">ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้</div>`;
+            }
+        }
+
+        async function fetchMyActivePosts() {
+            const token = localStorage.getItem('token');
+            const container = document.getElementById('marketContainer');
+            container.innerHTML = `<div class="col-span-full text-center py-12"><i class="fas fa-circle-notch fa-spin text-3xl text-indigo-300"></i></div>`;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/market/my-active-posts/${currentUserId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                container.innerHTML = '';
+
+                if (data.posts.length === 0) {
+                    container.innerHTML = `<div class="col-span-full text-center py-12 flex flex-col items-center justify-center opacity-50"><i class="fas fa-bullhorn text-4xl mb-3 text-slate-300"></i><span class="text-slate-400">คุณยังไม่มีประกาศขาย</span></div>`;
+                    return;
+                }
+
+                // ✅ Map ข้อมูลให้แน่ใจว่ามี schedule_id
+                const formatted = data.posts.map(row => ({ 
+                    id: row.id, 
+                    schedule_id: row.schedule_id, // ✅ ค่านี้มาจาก Backend ที่แก้แล้ว
+                    price: row.price, 
+                    message: row.message, 
+                    shift_date: row.shift_date, 
+                    shift_label: row.shift_label, 
+                    created_at: row.created_at 
+                }));
+
+                formatted.forEach(post => {
+                    const html = `
+                    <div class="bg-white rounded-2xl p-5 border border-indigo-100 shadow-sm hover-card transition-all-300 relative group cursor-pointer flex flex-col h-full animate-enter ring-1 ring-indigo-50">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="bg-indigo-600 text-white px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide">โพสต์ของคุณ</span>
+                            <small class="text-slate-400 text-xs">${safeTimeAgo(post.created_at)}</small> </div>
+
+                        <div class="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100/50 space-y-2">
+                             <div class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i class="far fa-calendar text-indigo-500"></i> ${moment(post.shift_date).format('D MMM YYYY')}
+                            </div>
+                            <div class="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                <i class="far fa-clock text-orange-500"></i> ${post.shift_label}
+                            </div>
+                        </div>
+
+                         <div class="mb-4">
+                            <div class="text-indigo-600 font-bold text-lg"><i class="fas fa-tag text-xs mr-1 opacity-50"></i> ${post.price}</div>
+                            <div class="text-xs text-slate-400 truncate mt-1">${post.message || '-'}</div>
+                        </div>
+
+                        <div class="mt-auto pt-4 border-t border-slate-50 flex gap-2">
+                            <button onclick="editPost(${post.id}, '${post.price}', '${post.message || ''}', ${post.schedule_id})" class="flex-1 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold transition-all">
+                                <i class="fas fa-edit mr-1"></i> แก้ไข
+                            </button>
+                            <button onclick="deletePost(${post.id})" class="flex-1 bg-white border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-bold transition-all">
+                                <i class="fas fa-trash-alt mr-1"></i> ลบ
+                            </button>
+                        </div>
+                    </div>`;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div class="col-span-full text-center text-red-400">โหลดข้อมูลล้มเหลว</div>`;
+            }
+        }
+
+        async function fetchMyStatus() {
+            const token = localStorage.getItem('token');
+            const container = document.getElementById('myStatusContainer');
+            try {
+                const response = await fetch(`${API_BASE}/api/market/my-requests/${currentUserId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                container.innerHTML = '';
+                
+                if (data.length === 0) {
+                    container.innerHTML = `<div class="col-span-full py-8 text-center text-slate-400 bg-white/60 rounded-xl border border-dashed border-slate-300 text-sm">ไม่มีรายการเคลื่อนไหว</div>`;
+                    return;
+                }
+                
+                data.forEach(item => {
+                    let statusColor, statusText, statusIcon;
+
+                    if (item.status === 'pending_seller') {
+                        statusColor = 'bg-yellow-100 text-yellow-700 border border-yellow-200'; statusText = 'รอเจ้าของเวรตอบรับ'; statusIcon = 'fa-user-clock';
+                    } else if (item.status === 'pending_headnurse') {
+                        statusColor = 'bg-blue-100 text-blue-700 border border-blue-200'; statusText = 'รอหัวหน้าอนุมัติ'; statusIcon = 'fa-user-nurse';
+                    } else if (item.status === 'completed') {
+                        statusColor = 'bg-green-100 text-green-700 border border-green-200'; statusText = 'สำเร็จ'; statusIcon = 'fa-check-circle';
+                    } else if (item.status === 'rejected' || item.status === 'cancelled') {
+                        statusColor = 'bg-red-100 text-red-700 border border-red-200'; statusText = 'ถูกปฏิเสธ/ยกเลิก'; statusIcon = 'fa-times-circle';
+                    } else {
+                        statusColor = 'bg-slate-100 text-slate-700 border border-slate-200'; statusText = item.status; statusIcon = 'fa-info-circle';
+                    }
+
+                    const html = `
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm animate-enter hover:border-indigo-300 transition-colors relative overflow-hidden">
+                         <div class="absolute left-0 top-0 bottom-0 w-1 ${statusColor.split(' ')[0]}"></div>
+                        <div class="flex justify-between items-start mb-2 pl-2">
+                            <span class="${statusColor} text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1">
+                                <i class="fas ${statusIcon}"></i> ${statusText}
+                            </span>
+                            <small class="text-slate-400 text-xs">${safeTimeAgo(item.created_at)}</small> </div>
+                        <p class="font-bold text-slate-800 text-sm truncate pl-2">${item.title}</p> 
+                        <div class="text-xs text-slate-500 mt-2 flex items-center gap-3 pl-2">
+                            <span class="flex items-center gap-1"><i class="far fa-calendar-alt text-slate-400"></i> ${moment(item.shift_date).format('D MMM')}</span>
+                            <span class="text-indigo-500 font-medium bg-indigo-50 px-2 py-0.5 rounded-md">${item.note || '-'}</span>
+                        </div>
+                    </div>`;
+                    container.insertAdjacentHTML('beforeend', html);
+                });
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div class="col-span-full text-center text-red-400 text-xs">โหลดสถานะไม่ได้</div>`;
+            }
+        }
+
+        async function checkIncomingRequests() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user')); // ดึงข้อมูล User เพื่อเช็ค RoleID
+
+            try {
+                // --- 1. ดึงคำขอสำหรับพยาบาลทั่วไป (Pending_Seller) ---
+                const res = await apiRequest(`${API_BASE}/api/market/incoming-requests/${currentUserId}`);
+                const data = await res.json();
+                let allRequests = data.requests || [];
+
+                // --- 2. ถ้าเป็นหัวหน้าพยาบาล (RoleID 1) ให้ดึงคำขอที่รออนุมัติขั้นสุดท้ายด้วย (Pending_HeadNurse) ---
+                if (user && user.RoleID === 1) {
+                    const adminRes = await fetch(`${API_BASE}/api/admin/market/pending`, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const adminData = await adminRes.json();
+                    
+                    // นำรายการจาก Admin มารวมเข้ากับรายการปกติ (ถ้ามี)
+                    if (adminData.success && adminData.results) {
+                        // เพิ่ม Flag พิเศษเพื่อให้แสดง UI ต่างกัน
+                        const adminTasks = adminData.results.map(item => ({ ...item, isAdminTask: true }));
+                        allRequests = [...allRequests, ...adminTasks];
+                    }
+                }
+
+                const container = document.getElementById('incomingRequestsSection');
+                const list = document.getElementById('incomingList');
+                list.innerHTML = '';
+
+                if (allRequests.length > 0) {
+                    container.classList.remove('hidden'); 
+                    
+                    allRequests.forEach(req => {
+                        // กำหนด UI และ Action ตามประเภทรายการ
+                        const isFinalStep = req.isAdminTask === true;
+                        const badgeColor = isFinalStep ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700';
+                        const badgeText = isFinalStep ? 'รออนุมัติสุดท้าย' : 'เสนอซื้อ';
+                        const cardBorder = isFinalStep ? 'border-blue-300 shadow-md' : 'border-slate-100';
+                        
+                        // ฟังก์ชันกดปุ่ม (หัวหน้าใช้ adminAction, พยาบาลใช้ respondToRequest)
+                        const actionFn = isFinalStep ? 'adminAction' : 'respondToRequest';
+                        const approveText = isFinalStep ? 'อนุมัติการซื้อขาย' : 'ยอมรับการขาย';
+
+                        const html = `
+                        <div class="bg-white p-4 rounded-xl shadow-sm border ${cardBorder} flex flex-col md:flex-row justify-between items-center gap-4 transition-all hover:border-indigo-300 mb-3 animate-enter">
+                            <div class="flex items-center gap-4 w-full">
+                                <div class="w-12 h-12 min-w-[3rem] rounded-full ${isFinalStep ? 'bg-blue-50 text-blue-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center font-bold text-lg border border-opacity-50">
+                                    <i class="fas ${isFinalStep ? 'fa-user-shield' : 'fa-shopping-cart'}"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                                        <p class="text-sm font-bold text-slate-800 truncate">
+                                            ${isFinalStep ? 'รายการรอท่านอนุมัติ' : 'คุณ ' + req.FirstName}
+                                        </p>
+                                        <span class="${badgeColor} text-[10px] px-2 py-0.5 rounded-full font-bold">${badgeText}</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500">
+                                        ${isFinalStep ? `<b>${req.SellerName}</b> ขายให้ <b>${req.BuyerName}</b>` : `ขอซื้อเวรของคุณ`}
+                                        <span class="font-semibold text-slate-700">${moment(req.ShiftDate).format('D MMM')} (${req.ShiftName})</span>
+                                    </p>
+                                    <div class="mt-1.5 inline-block text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">
+                                        ราคา: ${req.Price}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex gap-2 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 mt-2 md:mt-0">
+                                <button onclick="${actionFn}(${req.TransactionID}, 'reject')" class="flex-1 md:flex-none px-5 py-2.5 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors">
+                                    ปฏิเสธ
+                                </button>
+                                <button onclick="${actionFn}(${req.TransactionID}, 'approve')" class="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-95">
+                                    ${approveText}
+                                </button>
+                            </div>
+                        </div>`;
+                        list.insertAdjacentHTML('beforeend', html);
+                    });
+                } else {
+                    container.classList.add('hidden'); 
+                }
+            } catch (err) {
+                console.error('Check incoming error:', err);
+            }
+        }
+
+        function respondToRequest(transactionId, action) {
+            const token = localStorage.getItem('token');
+            Swal.fire({
+                title: action === 'approve' ? 'ยืนยันการขาย?' : 'ปฏิเสธคำขอ?',
+                text: action === 'approve' ? 'เมื่อยืนยันแล้ว คำขอจะถูกส่งต่อไปยังหัวหน้าพยาบาลเพื่ออนุมัติขั้นสุดท้าย' : 'รายการนี้จะถูกยกเลิกทันที',
+                icon: action === 'approve' ? 'info' : 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ยืนยัน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: action === 'approve' ? '#4f46e5' : '#ef4444',
+                customClass: { popup: 'rounded-2xl' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(`${API_BASE}/api/market/seller-respond`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ transactionId, action })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({ icon: 'success', title: 'ดำเนินการสำเร็จ', showConfirmButton: false, timer: 1500, customClass: { popup: 'rounded-2xl' } });
+                            reloadData(this);
+                        } else {
+                            Swal.fire('Error', 'เกิดข้อผิดพลาด', 'error');
+                        }
+                    });
+                }
+            });
+        }
+
+        const overlay = document.getElementById('postModalOverlay');
+        const modal = document.getElementById('postModal');
+
+        async function openPostModal() {
+            const token = localStorage.getItem('token');
+            const select = document.getElementById('post-my-shift');
+            select.innerHTML = '<option value="" disabled selected>🔄 กำลังโหลด...</option>';
+            
+            document.getElementById('postModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('postModal').classList.remove('opacity-0'), 10);
+            document.getElementById('postModalContent').classList.replace('scale-90', 'scale-100');
+
+            try {
+                const res = await apiRequest(`${API_BASE}/api/schedule/my-future-shifts/${currentUser.UserID}`);
+                const data = await res.json();
+
+                if (data.success && data.results.length > 0) {
+                    // ✅ กรองออกทันที: ไม่เอาเวรที่ลงขายอยู่, ติด Transaction, หรือรอแลกอยู่
+                    const availableShifts = data.results.filter(s => {
+                        return !(s.SellingStatus === 'Open' || s.TransactionStatus || s.ExchangeStatus === 'pending');
+                    });
+
+                    if (availableShifts.length > 0) {
+                        let options = '<option value="">-- เลือกเวรของคุณที่จะปล่อย --</option>';
+                        availableShifts.forEach(s => {
+                            options += `<option value="${s.ScheduleID}">${moment(s.Nurse_Date).add(543, 'years').format('D MMM YY')} - ${s.ShiftName}</option>`;
+                        });
+                        select.innerHTML = options;
+                    } else {
+                        select.innerHTML = '<option value="" disabled>ไม่มีเวรว่างที่สามารถประกาศแลกได้</option>';
+                    }
+                } else {
+                    select.innerHTML = '<option value="" disabled>ไม่พบข้อมูลเวรในตาราง</option>';
+                }
+            } catch (e) {
+                select.innerHTML = '<option value="" disabled>Error: ไม่สามารถโหลดข้อมูลได้</option>';
+            }
+        }
+
+        function closePostModal() {
+            overlay.classList.add('opacity-0');
+            modal.classList.remove('md:-translate-y-1/2'); 
+            modal.classList.add('translate-y-full', 'md:translate-y-[20%]');
+            setTimeout(() => { 
+                overlay.classList.add('hidden'); 
+                modal.classList.add('hidden');
+            }, 300);
+        }
+        overlay.addEventListener('click', closePostModal);
+
+        async function loadMySellableShifts() {
+            const token = localStorage.getItem('token');
+            const selector = document.getElementById('shiftSelector');
+            selector.innerHTML = '<option value="" disabled selected>🔄 กำลังตรวจสอบสถานะเวร...</option>';
+
+            try {
+                // ดึงข้อมูลเวรของคุณ (ตรวจสอบว่า Backend ส่งสถานะธุรกรรมมาด้วย)
+                const res = await apiRequest(`${API_BASE}/api/my-sellable-shifts/${currentUserId}`);
+
+                if(res.status === 401) { window.location.href = 'login.html'; return; }
+                const data = await res.json();
+
+                if(data.success && data.shifts.length > 0) {
+                    selector.innerHTML = '<option value="" disabled selected>-- เลือกเวรที่ต้องการขาย --</option>';
+                    
+                    data.shifts.forEach(shift => {
+                        // ตรวจสอบเงื่อนไขธุรกรรม (อ้างอิงจากสถานะที่ Backend ส่งมา)
+                        const isSelling = shift.SellingStatus === 'Open';
+                        const isInTransaction = shift.TransactionStatus; // เช่น Pending_Seller, Pending_HeadNurse
+                        const isExchanging = shift.ExchangeStatus === 'pending';
+                        
+                        const isBusy = isSelling || isInTransaction || isExchanging;
+                        
+                        let statusNote = "";
+                        if (isSelling) statusNote = " (ลงขายไว้แล้ว)";
+                        else if (isInTransaction) statusNote = " (รออนุมัติซื้อขาย)";
+                        else if (isExchanging) statusNote = " (มีคำขอแลกค้างอยู่)";
+
+                        const option = document.createElement('option');
+                        option.value = shift.id;
+                        // ถ้าติดธุรกรรม ให้ใส่ disabled และเปลี่ยนสีข้อความ
+                        if (isBusy) {
+                            option.disabled = true;
+                            option.style.color = '#94a3b8'; // สีเทา
+                        }
+                        option.textContent = `${shift.label}${statusNote}`;
+                        selector.appendChild(option);
+                    });
+                } else {
+                    selector.innerHTML = '<option value="" disabled selected>ไม่มีเวรที่สามารถประกาศขายได้</option>';
+                }
+            } catch (err) {
+                selector.innerHTML = '<option value="" disabled selected>เกิดข้อผิดพลาดในการโหลดข้อมูล</option>';
+            }
+        }
+        async function submitPost(e) {
+            e.preventDefault();
+            const token = localStorage.getItem('token');
+            const formData = new FormData(e.target);
+            const selectedScheduleId = formData.get('scheduleId');
+            
+            if(!selectedScheduleId) {
+                Swal.fire('แจ้งเตือน', 'กรุณาเลือกเวรที่ต้องการขาย', 'warning');
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
+            btn.disabled = true;
+
+            try {
+                // 1. ตรวจสอบสถานะล่าสุดจาก Server ก่อน (Real-time Validation)
+                const checkRes = await fetch(`${API_BASE}/api/swaps/check-status/${selectedScheduleId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const statusData = await checkRes.json();
+
+                if (statusData.success && (statusData.isSelling || statusData.isPending || statusData.isInTransaction)) {
+                    let msg = "ไม่สามารถลงประกาศได้ เนื่องจากเวรนี้มีธุรกรรมค้างอยู่";
+                    if (statusData.isSelling) msg = "คุณได้ลงประกาศขายเวรนี้ไปแล้ว";
+                    if (statusData.isPending) msg = "เวรนี้กำลังอยู่ในขั้นตอนการขอแลกเปลี่ยน";
+
+                    Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: msg, confirmButtonColor: '#4f46e5' });
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+
+                // 2. หากผ่านการตรวจสอบ ค่อยส่งไปบันทึก
+                const payload = {
+                    userId: currentUserId,
+                    scheduleId: selectedScheduleId,
+                    price: formData.get('condition'),
+                    message: formData.get('message') || '' 
+                };
+
+                const res = await apiRequest(`${API_BASE}/api/sell-shift`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if(data.success) {
+                    closePostModal();
+                    Swal.fire({ icon: 'success', title: 'ลงประกาศสำเร็จ', showConfirmButton: false, timer: 1500 });
+                    e.target.reset();
+                    switchTab('my-posts'); 
+                } else {
+                    Swal.fire('Error', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Error', 'การเชื่อมต่อล้มเหลว', 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function deletePost(postId) {
+            const token = localStorage.getItem('token');
+            
+            // ตรวจสอบเบื้องต้น
+            if (!postId) {
+                Swal.fire('Error', 'ไม่พบรหัสโพสต์', 'error');
+                return;
+            }
+
+            Swal.fire({
+                title: 'ยืนยันการลบ?',
+                text: "เมื่อลบแล้วจะไม่สามารถนำประกาศกลับมาได้",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                confirmButtonText: 'ใช่, ลบเลย',
+                cancelButtonText: 'ยกเลิก',
+                customClass: { popup: 'rounded-2xl' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // เริ่มส่ง API
+                    fetch(`${API_BASE}/api/market/delete-post`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json', // ระบุชนิดข้อมูล
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ postId: postId }) // ส่งค่าให้ตรงกับ Backend
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({ icon: 'success', title: 'ลบสำเร็จ', showConfirmButton: false, timer: 1000 });
+                            fetchMyActivePosts(); // รีโหลดรายการใหม่
+                        } else {
+                            // กรณี Backend ตอบกลับ 400 พร้อมข้อความแจ้งเตือน (เช่น มีคนจองซื้ออยู่)
+                            Swal.fire('ลบไม่ได้', data.message, 'warning');
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Delete Error:", err);
+                        Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error');
+                    });
+                }
+            });
+        }
+
+        // ✅ ฟังก์ชันใหม่สำหรับการแก้ไขเวร
+        async function editPost(postId, oldPrice, oldMsg, currentScheduleId) {
+            const token = localStorage.getItem('token');
+            
+            // แสดง Loading
+            Swal.fire({ title: 'กำลังโหลดข้อมูล...', didOpen: () => Swal.showLoading() });
+
+            try {
+                // ดึงรายชื่อเวรที่ขายได้ (My Sellable Shifts)
+                const res = await apiRequest(`${API_BASE}/api/my-sellable-shifts/${currentUserId}`);
+                const data = await res.json();
+                
+                let shiftOptionsHtml = '';
+                
+                if (data.success && data.shifts.length > 0) {
+                    shiftOptionsHtml = data.shifts.map(shift => {
+                        const isSelected = shift.id == currentScheduleId ? 'selected' : '';
+                        return `<option value="${shift.id}" ${isSelected}>${shift.label}</option>`;
+                    }).join('');
+                }
+                
+                // กรณี API ไม่ส่งเวรปัจจุบันกลับมา (เพราะติดสถานะ Open) ให้เพิ่มตัวเลือกปัจจุบัน
+                if(shiftOptionsHtml === '') {
+                     shiftOptionsHtml = `<option value="${currentScheduleId}" selected>เวรปัจจุบัน (ไม่มีเวรอื่นให้เปลี่ยน)</option>`;
+                }
+
+                // แสดง Popup พร้อม Dropdown
+                const { value: formValues } = await Swal.fire({
+                    title: 'แก้ไขประกาศ',
+                    html:
+                        `<div class="text-left space-y-3">` +
+                            `<div>` +
+                                `<label class="block text-sm mb-1 text-slate-600 font-bold">เลือกเวรที่จะขาย</label>` +
+                                `<select id="swal-schedule" class="swal2-input !m-0 !h-10 w-full text-sm">` +
+                                    shiftOptionsHtml +
+                                `</select>` +
+                            `</div>` +
+
+                            `<div>` +
+                                `<label class="block text-sm mb-1 text-slate-600 font-bold">ราคา/เงื่อนไข</label>` +
+                                `<input id="swal-price" class="swal2-input !m-0 !h-10 w-full" value="${oldPrice}">` +
+                            `</div>` +
+
+                            `<div>` +
+                                `<label class="block text-sm mb-1 text-slate-600 font-bold">ข้อความเพิ่มเติม</label>` +
+                                `<input id="swal-msg" class="swal2-input !m-0 !h-10 w-full" value="${oldMsg}">` +
+                            `</div>` +
+                        `</div>`,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'บันทึก',
+                    cancelButtonText: 'ยกเลิก',
+                    confirmButtonColor: '#4f46e5',
+                    customClass: { popup: 'rounded-2xl' },
+                    preConfirm: () => {
+                        return {
+                            scheduleId: document.getElementById('swal-schedule').value,
+                            price: document.getElementById('swal-price').value,
+                            message: document.getElementById('swal-msg').value
+                        }
+                    }
+                });
+
+                if (formValues) {
+                    if (!formValues.scheduleId) {
+                        Swal.fire('แจ้งเตือน', 'กรุณาเลือกเวร', 'warning');
+                        return;
+                    }
+
+                    fetch(`${API_BASE}/api/market/edit-post`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ 
+                            postId, 
+                            userId: currentUserId, 
+                            ...formValues 
+                        }) 
+                    })
+                    .then(async response => {
+                        const data = await response.json();
+                        if (response.ok) {
+                            Swal.fire({ title: 'บันทึกสำเร็จ', icon: 'success', timer: 1000, showConfirmButton: false });
+                            fetchMyActivePosts(); // รีโหลดข้อมูลใหม่
+                        } else {
+                            Swal.fire('ทำรายการไม่ได้', data.message, 'warning');
+                        }
+                    })
+                    .catch(err => Swal.fire('Error', 'ไม่สามารถเชื่อมต่อ Server ได้', 'error'));
+                }
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลเวรได้', 'error');
+            }
+        }
+
+        function requestTrade(shiftId, sellerName) {
+            const token = localStorage.getItem('token');
+            Swal.fire({
+                title: `ซื้อเวรจาก ${sellerName}?`,
+                text: "ระบบจะส่งคำขอไปยังเจ้าของเวรเพื่ออนุมัติ",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#4f46e5',
+                confirmButtonText: 'ยืนยันซื้อ',
+                cancelButtonText: 'ยกเลิก',
+                customClass: { popup: 'rounded-2xl' }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // แสดง Loading ระหว่างรอเช็คความเสี่ยง
+                    Swal.fire({ title: 'กำลังตรวจสอบความปลอดภัย...', didOpen: () => Swal.showLoading() });
+
+                    fetch(`${API_BASE}/api/market/request-trade`, { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ buyerId: currentUserId, postSellId: shiftId })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // --- จุดที่เพิ่ม: ถ้ามีคำเตือนความเสี่ยง (เช่น บ่ายต่อเช้า) ---
+                            if (data.fatigueWarning) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ตรวจพบความเสี่ยงความล้า',
+                                    text: data.fatigueWarning,
+                                    confirmButtonText: 'รับทราบและส่งคำขอ',
+                                    confirmButtonColor: '#f59e0b'
+                                }).then(() => {
+                                    reloadData();
+                                });
+                            } else {
+                                Swal.fire({ icon: 'success', title: 'ส่งคำขอสำเร็จ', showConfirmButton: false, timer: 2000 });
+                                reloadData();
+                            }
+                        } else {
+                            Swal.fire('เกิดข้อผิดพลาด', data.message || 'ไม่สามารถทำรายการได้', 'error');
+                        }
+                    })
+                    .catch(err => Swal.fire('Error', 'การเชื่อมต่อล้มเหลว', 'error'));
+                }
+            });
+        }
+
+        function filterShifts(type) {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn px-4 py-2 rounded-lg bg-white text-slate-600 border border-slate-200 text-xs font-medium hover:text-indigo-600 hover:border-indigo-300 whitespace-nowrap transition-all';
+            });
+            event.target.className = 'filter-btn active px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-medium shadow-md whitespace-nowrap transition-all';
+            
+            fetchMarketData(type);
+        }
+        async function adminAction(transactionId, action) {
+            const result = await Swal.fire({
+                title: action === 'approve' ? 'ยืนยันการอนุมัติ?' : 'ยืนยันการปฏิเสธ?',
+                text: action === 'approve' ? "ข้อมูลตารางเวรของพยาบาลทั้งสองท่านจะถูกสลับทันที" : "คำขอนี้จะถูกยกเลิก",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: action === 'approve' ? '#10b981' : '#ef4444',
+                confirmButtonText: 'ตกลง',
+                cancelButtonText: 'ยกเลิก'
+            });
+
+            if (result.isConfirmed) {
+                const token = localStorage.getItem('token');
+                try {
+                    const res = await apiRequest(`${API_BASE}/api/admin/market/action`, {
+                        method: 'POST',
+                        body: JSON.stringify({ transactionId, action, adminId: currentUserId })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        // แจ้งสำเร็จและ Refresh ข้อมูล
+                        await Swal.fire({ icon: 'success', title: 'ดำเนินการเรียบร้อย', text: data.message, timer: 1500, showConfirmButton: false });
+                        reloadData(); 
+                    } else {
+                        // ถ้าไม่สำเร็จ (เช่น ติดกฎความปลอดภัยในวินาทีสุดท้าย) ให้แจ้งเหตุผล
+                        Swal.fire('ไม่สามารถอนุมัติได้', data.message, 'error');
+                    }
+                } catch (err) {
+                    Swal.fire('Error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+                }
+            }
+        }
+        async function fetchAdminPendingActions() {
+            // เช็คก่อนว่าเป็นหัวหน้าพยาบาลหรือไม่ (RoleID 1)
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user.RoleID !== 1) return; 
+
+            const token = localStorage.getItem('token');
+            const container = document.getElementById('marketContainer'); // หรือ ID ของส่วนแสดงผลแจ้งเตือน
+
+            try {
+                const res = await apiRequest(`${API_BASE}/api/admin/market/pending`);
+                const data = await res.json();
+
+                if (data.success && data.results.length > 0) {
+                    // ถ้ามีรายการรออนุมัติ ให้ลบข้อความ "ไม่มีรายการใหม่" ออก
+                    const emptyState = document.querySelector('.no-items-message');
+                    if (emptyState) emptyState.style.display = 'none';
+
+                    data.results.forEach(item => {
+                        const cardHtml = `
+                        <div class="bg-white p-5 rounded-2xl border-2 border-indigo-100 shadow-sm mb-4 animate-enter">
+                            <div class="flex justify-between items-start mb-3">
+                                <span class="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">รออนุมัติการซื้อขาย</span>
+                                <small class="text-slate-400 text-xs">${moment(item.CreatedAt).fromNow()}</small>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-sm text-slate-700">
+                                    <b>${item.SellerName}</b> ขายเวรให้ <b>${item.BuyerName}</b>
+                                </p>
+                                <p class="text-xs text-slate-500">
+                                    <i class="far fa-calendar-alt"></i> วันที่เวร: ${moment(item.ShiftDate).format('D MMM YYYY')} (${item.ShiftName})
+                                </p>
+                            </div>
+                            <div class="flex gap-2 mt-4">
+                                <button onclick="adminAction(${item.TransactionID}, 'reject')" class="flex-1 px-4 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-bold hover:bg-red-50 transition-all">
+                                    ปฏิเสธ
+                                </button>
+                                <button onclick="adminAction(${item.TransactionID}, 'approve')" class="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-md transition-all active:scale-95">
+                                    อนุมัติการสลับเวร
+                                </button>
+                            </div>
+                        </div>`;
+                        container.insertAdjacentHTML('afterbegin', cardHtml);
+                    });
+                }
+            } catch (err) {
+                console.error("Fetch Admin Error:", err);
+            }
+        }
+    </script>
+</body>
+</html>

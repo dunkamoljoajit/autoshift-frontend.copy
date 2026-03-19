@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบแลกเปลี่ยนเวรพยาบาล - AutoNurseShift</title>
+    
+    <link href="./style.css" rel="stylesheet">
+    <link rel="stylesheet" href="./lib/flatpickr.css">
+    <script src="./lib/flatpickr.js"></script>
+    <script src="./lib/th.js"></script>
+    
+    <link rel="stylesheet" href="./lib/fontawesome/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/locale/th.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="components.js"></script> 
+
+    <style>
+        body { 
+            font-family: 'Kanit', sans-serif; 
+            background-color: #f0f4f8;
+            background-size: cover; 
+            background-position: center;
+            background-attachment: fixed;
+            -webkit-tap-highlight-color: transparent; 
+            transition: background-image 0.5s ease-in-out;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @keyframes enter {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-enter { animation: enter 0.4s ease-out forwards; }
+        .black-bracket-card {
+            position: relative;
+            background: white;
+            border-radius: 2rem;
+            padding-left: 1.5rem; 
+            overflow: hidden;
+        }
+        .black-bracket-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 15%;
+            bottom: 15%;
+            width: 8px;
+            background-color: #000;
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+        .purple-bracket-card {
+            position: relative;
+            background: white;
+            border-radius: 2rem;
+            padding-left: 1.5rem; 
+            overflow: hidden;
+            border: 1px solid #f3e8ff;
+        }
+        .purple-bracket-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 15%;
+            bottom: 15%;
+            width: 8px;
+            background-color: #9333ea;
+            border-top-right-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col h-screen relative text-slate-800 overflow-hidden">
+
+    <app-header class="sticky top-0 z-30"></app-header>
+
+    <main class="flex-1 overflow-y-auto pb-24 md:pb-10 scroll-smooth p-4 md:p-6 lg:p-8 custom-scrollbar">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+
+            <div class="lg:col-span-8 space-y-6">
+                <div class="bg-white/90 backdrop-blur-sm rounded-[2rem] shadow-lg shadow-indigo-100/50 border border-white p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-indigo-100 to-transparent rounded-bl-[4rem] -z-0 opacity-60"></div>
+                    <div class="relative z-10">
+                        <h2 class="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fas fa-search"></i></span>
+                            ค้นหาเพื่อนแลกเวร
+                        </h2>
+                        <p class="text-slate-500 text-sm mb-6 pl-10">ค้นหาคนที่เข้าเวรในวันที่คุณต้องการ เพื่อส่งคำขอแลกเปลี่ยน</p>
+
+                        <form id="searchForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase tracking-wider">วันที่ต้องการเวร</label>
+                                <div class="relative">
+                                    <input type="text" id="searchDate" placeholder="เลือกวันที่..." 
+                                           class="w-full h-[50px] bg-white border border-slate-200 rounded-2xl px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400 shadow-sm transition">
+                                    <i class="far fa-calendar absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase tracking-wider">ช่วงเวลา</label>
+                                <div class="relative group">
+                                    <select id="searchShift" class="w-full h-[50px] bg-white border border-slate-200 rounded-2xl px-4 pl-10 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer appearance-none shadow-sm transition">
+                                        <option value="">ทุกช่วงเวลา</option>
+                                        <option value="1">☀️ เวรเช้า (08:00 - 16:00)</option>
+                                        <option value="2">🌤️ เวรบ่าย (16:00 - 24:00)</option>
+                                        <option value="3">🌙 เวรดึก (24:00 - 08:00)</option>
+                                    </select>
+                                    <i class="fas fa-clock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-500 transition"></i>
+                                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <button type="submit" id="search-btn" class="w-full h-[50px] bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl px-4 text-sm font-medium shadow-sm transition duration-200 flex items-center justify-center">
+                                    <span id="search-btn-text" class="flex items-center gap-2">
+                                        <i class="fas fa-search"></i> ค้นหา
+                                    </span>
+                                    <i id="search-loading" class="fas fa-spinner fa-spin hidden"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="results-area" class="opacity-0 transition-opacity duration-500">
+                    <div class="flex items-center justify-between mb-4 px-2">
+                        <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                            <i class="fas fa-user-nurse text-indigo-500"></i> ผลการค้นหา
+                        </h3>
+                        <span id="result-count" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">พร้อมค้นหา</span>
+                    </div>
+                    <div id="searchResults" class="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[200px]">
+                        <div class="col-span-full flex flex-col items-center justify-center py-12 bg-white/40 rounded-[2rem] border-2 border-dashed border-slate-200/60">
+                            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                                <i class="fas fa-search-location text-2xl text-slate-300"></i>
+                            </div>
+                            <p class="text-slate-500 font-medium text-sm">ระบุเงื่อนไขด้านบนเพื่อเริ่มค้นหา</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-24 h-fit">
+                <div class="black-bracket-card p-6 shadow-sm bg-white rounded-[2rem]">
+                    <div class="flex items-center justify-between mb-4 pl-4">
+                        <h3 class="font-bold text-slate-700 text-lg flex items-center gap-2">ประกาศของฉัน</h3>
+                        <button onclick="openPostModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-[#0e7490] hover:text-white text-slate-600 transition flex items-center justify-center shadow-sm active:scale-95" title="สร้างประกาศใหม่">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div id="my-posts-list" class="space-y-3 min-h-[100px] max-h-[300px] overflow-y-auto custom-scrollbar pl-4 pr-1">
+                         <div class="text-center text-slate-300 text-xs py-8">กำลังโหลดข้อมูล...</div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between px-2 pt-2">
+                    <h3 class="font-handwriting text-2xl italic font-bold text-slate-700">คำขอแลกเปลี่ยน</h3>
+                    <span id="incoming-badge" class="hidden bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">New</span>
+                </div>
+                <div id="incoming-list" class="space-y-4 min-h-[100px] max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                    <div class="text-center text-slate-400 py-4 text-xs font-light">กำลังโหลด...</div>
+                </div>
+
+                <div id="head-nurse-approval-section" class="hidden mt-8 space-y-4 pt-4 border-t border-slate-200">
+                    <div class="flex items-center justify-between px-2">
+                        <h3 class="font-bold text-slate-700 text-lg flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                                <i class="fas fa-file-signature"></i>
+                            </span>
+                            รายการรออนุมัติ
+                        </h3>
+                        <span id="approval-badge" class="bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded-full">0</span>
+                    </div>
+                    <div id="approval-list" class="space-y-4 min-h-[100px] max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
+                        <div class="text-center text-slate-400 py-4 text-xs font-light">ไม่มีรายการค้างอนุมัติ</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <app-navbar></app-navbar>
+
+    <div id="requestModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl transform scale-90 transition-all duration-300 relative overflow-hidden" id="requestModalContent">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+            <div class="flex justify-between items-start mb-6 mt-1">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-800">ยืนยันการแลกเวร</h3>
+                    <div class="text-sm text-slate-500 mt-1">แลกกับ: <span id="modal-target-name" class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">...</span></div>
+                </div>
+                <button onclick="closeRequestModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="sendRequestForm" class="space-y-5">
+                <input type="hidden" id="modal-target-user-id">
+                <input type="hidden" id="modal-target-schedule-id">
+                <div class="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100">
+                    <label class="block text-xs font-bold text-indigo-800 mb-2 uppercase tracking-wide"><i class="fas fa-user-clock mr-1"></i> เวรของคุณที่จะแลก</label>
+                    <div class="relative">
+                        <select id="my-offer-shift" class="w-full bg-white border border-indigo-200 rounded-xl p-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer appearance-none" required><option value="">กำลังโหลดข้อมูล...</option></select>
+                        <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">เหตุผล (ถ้ามี)</label>
+                    <textarea id="modal-reason" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400" placeholder="ระบุเหตุผล..."></textarea>
+                </div>
+                <button type="submit" id="submit-request-btn" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"><i class="fas fa-check-circle"></i> ส่งคำขอแลกเปลี่ยน</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="postModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl transform scale-90 transition-all duration-300 relative overflow-hidden" id="postModalContent">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"><span class="w-10 h-10 rounded-xl bg-pink-50 text-pink-500 flex items-center justify-center"><i class="fas fa-bullhorn"></i></span> โพสต์หาคนแลกเวร</h3>
+                <button onclick="closePostModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="createPostForm" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">วันที่อยากได้ (ไม่ระบุก็ได้)</label>
+                    <div class="relative">
+                        <input type="text" id="post-desired-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 placeholder-slate-400" placeholder="ใครก็ได้ / วันไหนก็ได้">
+                        <i class="far fa-calendar absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+                <div class="bg-pink-50/50 rounded-2xl p-4 border border-pink-100">
+                    <label class="block text-xs font-bold text-pink-800 mb-2 uppercase tracking-wide">เลือกเวรของคุณที่จะปล่อย</label>
+                    <div class="relative">
+                        <select id="post-my-shift" class="w-full bg-white border border-pink-200 rounded-xl p-3 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer appearance-none" required><option value="">กำลังโหลดเวรของคุณ...</option></select>
+                        <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-pink-300 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">ข้อความเพิ่มเติม</label>
+                    <textarea id="post-note" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-500 placeholder-slate-400" placeholder="เช่น ติดธุระด่วน..."></textarea>
+                </div>
+                <button type="submit" id="btn-create-post" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2"><i class="fas fa-paper-plane"></i> โพสต์ลงกระดาน</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="editPostModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl transform scale-90 transition-all duration-300 relative overflow-hidden" id="editPostModalContent">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <span class="w-10 h-10 rounded-xl bg-yellow-50 text-yellow-500 flex items-center justify-center"><i class="fas fa-edit"></i></span>
+                    แก้ไขประกาศ
+                </h3>
+                <button onclick="closeEditPostModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="editPostForm" class="space-y-5">
+                <input type="hidden" id="edit-post-id">
+                <div>
+                    <div class="flex justify-between items-end mb-1.5">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide">วันที่อยากได้</label>
+                        <button type="button" onclick="window.clearEditDate()" class="text-[10px] text-red-500 hover:text-red-700 hover:underline transition">
+                            <i class="fas fa-times-circle"></i> รีเซ็ตเป็นวันไหนก็ได้
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="edit-desired-date" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 placeholder-slate-400" placeholder="ใครก็ได้ / วันไหนก็ได้">
+                        <i class="far fa-calendar absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">เวรที่ประกาศแลก</label>
+                    <div class="relative">
+                        <select id="edit-post-schedule-id" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 cursor-pointer appearance-none">
+                            <option value="" disabled>กำลังโหลด...</option>
+                        </select>
+                        <i class="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wide">ข้อความเพิ่มเติม</label>
+                    <textarea id="edit-post-note" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500 placeholder-slate-400"></textarea>
+                </div>
+                <button type="submit" id="btn-update-post" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fas fa-save"></i> บันทึกการเปลี่ยนแปลง
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+// --- 1. Global Variables & Initialization ---
+let currentUser = null;
+if (typeof API_BASE === 'undefined') {
+    window.API_BASE = ''; 
+}
+
+// ผูกฟังก์ชันเข้ากับ Window เพื่อให้ HTML เรียกใช้ได้
+window.openPostModal = openPostModal;
+window.closePostModal = closePostModal;
+window.handleSearch = handleSearch;
+window.openRequestModal = openRequestModal;
+window.closeRequestModal = closeRequestModal;
+window.handleSendRequest = handleSendRequest;
+window.handleCreatePost = handleCreatePost;
+window.deletePost = deletePost;
+window.respondSwap = respondSwap;
+window.respondApproval = respondApproval;
+window.fetchPendingApprovals = fetchPendingApprovals;
+window.openEditPostModal = openEditPostModal;
+window.closeEditPostModal = closeEditPostModal;
+window.handleUpdatePost = handleUpdatePost;
+window.clearEditDate = clearEditDate;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const userStr = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+
+    if(!userStr || !token) { 
+        window.location.href = 'login.html'; 
+        return; 
+    }
+    currentUser = JSON.parse(userStr);
+    
+    if (currentUser.RoleID === 1) {
+        document.body.style.backgroundImage = "url('background01.png')"; 
+        document.getElementById('head-nurse-approval-section')?.classList.remove('hidden');
+        fetchPendingApprovals();
+    } else {
+        document.body.style.backgroundImage = "url('background06.png')";
+    }
+
+    const fpConfig = { locale: "th", dateFormat: "Y-m-d", altInput: true, altFormat: "j F Y", disableMobile: "true" };
+    flatpickr("#searchDate", fpConfig);
+    flatpickr("#post-desired-date", fpConfig);
+    flatpickr("#edit-desired-date", fpConfig);
+
+    document.getElementById('results-area').classList.remove('opacity-0');
+    
+    fetchIncomingRequests();
+    fetchMyActivePost(); 
+    
+    // Bind Form Listeners
+    document.getElementById('searchForm').addEventListener('submit', handleSearch);
+    document.getElementById('sendRequestForm').addEventListener('submit', handleSendRequest);
+    document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
+    document.getElementById('editPostForm').addEventListener('submit', handleUpdatePost);
+});
+
+// --- 2. ฟังก์ชันค้นหา (แก้ไข Spinner) ---
+async function handleSearch(e) {
+    if (e) e.preventDefault();
+    const date = document.getElementById('searchDate').value; 
+    const shiftId = document.getElementById('searchShift').value;
+    const container = document.getElementById('searchResults');
+    const token = localStorage.getItem('token');
+    
+    if(!date) return Swal.fire({ icon: 'warning', title: 'กรุณาเลือกวันที่ต้องการ' });
+
+    // เริ่มโหลด: โชว์ตัวหมุน ซ่อนข้อความ
+    document.getElementById('search-btn-text').classList.add('hidden');
+    document.getElementById('search-loading').classList.remove('hidden');
+    document.getElementById('search-btn').disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/swaps/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ date, shiftId, requesterId: currentUser.UserID })
+        });
+        const data = await response.json();
+        container.innerHTML = '';
+
+        if(data.success && data.results.length > 0) {
+            document.getElementById('result-count').innerText = `พบ ${data.results.length} กะที่เปิดแลก`;
+            container.innerHTML = data.results.map((item, i) => `
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3 animate-enter" style="animation-delay:${i*0.05}s">
+                    <div class="flex items-center gap-3 w-full border-b border-slate-50 pb-3">
+                        <img src="${item.ProfileImage || 'https://placehold.co/100'}" class="w-12 h-12 rounded-full border-2 border-slate-50 object-cover">
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-sm">${item.FirstName} ${item.LastName}</h4>
+                            <div class="text-[10px] font-bold text-indigo-600 uppercase">${item.ShiftName}</div>
+                        </div>
+                    </div>
+                    <button onclick="window.openRequestModal('${item.UserID}', '${item.FirstName}', '${item.ScheduleID}')" 
+                            class="w-full bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold py-3 rounded-xl transition">
+                        ตรวจสอบเพื่อแลกกะนี้
+                    </button>
+                </div>`).join('');
+        } else {
+            document.getElementById('result-count').innerText = "ไม่พบข้อมูล";
+            container.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 italic border-2 border-dashed border-slate-100 rounded-[2rem]">ไม่พบกะเวลาที่ต้องการในระบบ</div>`;
+        }
+    } catch (err) { 
+        console.error(err);
+        Swal.fire('Error', 'การเชื่อมต่อผิดพลาด', 'error'); 
+    } finally {
+        // จบการโหลด: ซ่อนตัวหมุน โชว์ข้อความ
+        document.getElementById('search-btn-text').classList.remove('hidden');
+        document.getElementById('search-loading').classList.add('hidden');
+        document.getElementById('search-btn').disabled = false;
+    }
+}
+
+// --- 3. ฟังก์ชันแก้ไขและจัดการประกาศ ---
+async function openEditPostModal(post) {
+    const token = localStorage.getItem('token');
+    try {
+        const checkRes = await fetch(`${API_BASE}/api/swaps/check-status/${post.ScheduleID}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const statusData = await checkRes.json();
+
+        if (statusData.success && statusData.isPending) {
+            return Swal.fire({ icon: 'warning', title: 'ไม่สามารถแก้ไขได้', text: 'เวรนี้กำลังมีคำขอแลกเปลี่ยนค้างอยู่' });
+        }
+
+        document.getElementById('edit-post-id').value = post.PostID;
+        document.getElementById('edit-post-note').value = post.Note || '';
+        if (post.DesiredDate && document.getElementById('edit-desired-date')._flatpickr) {
+            document.getElementById('edit-desired-date')._flatpickr.setDate(post.DesiredDate);
+        }
+
+        const select = document.getElementById('edit-post-schedule-id');
+        select.innerHTML = '<option value="" disabled>🔄 กำลังโหลด...</option>';
+        const res = await apiRequest(`${API_BASE}/api/schedule/my-future-shifts/${currentUser.UserID}`);
+        const data = await res.json();
+
+        if (data.success) {
+            select.innerHTML = data.results.map(s => `
+                <option value="${s.ScheduleID}" ${s.ScheduleID == post.ScheduleID ? 'selected' : ''}>
+                    ${moment(s.Nurse_Date).add(543, 'years').format('D MMM YY')} - ${s.ShiftName}
+                </option>
+            `).join('');
+        }
+
+        const modal = document.getElementById('editPostModal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        document.getElementById('editPostModalContent').classList.replace('scale-90', 'scale-100');
+    } catch (err) { Swal.fire('Error', 'เปิดหน้าแก้ไขไม่ได้', 'error'); }
+}
+
+async function handleUpdatePost(e) {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    const postId = document.getElementById('edit-post-id').value;
+    const submitBtn = document.getElementById('btn-update-post');
+    const body = {
+        scheduleId: document.getElementById('edit-post-schedule-id').value,
+        desiredDate: document.getElementById('edit-desired-date').value,
+        note: document.getElementById('edit-post-note').value,
+        userId: currentUser.UserID
+    };
+    if(!body.scheduleId) return Swal.fire('กรุณาเลือกเวร', '', 'warning');
+    
+    const originalContent = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
+    submitBtn.disabled = true;
+
+    try {
+        const res = await apiRequest(`${API_BASE}/api/posts/update/${postId}`, {
+            method: 'PUT',
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            Swal.fire({ icon: 'success', title: 'สำเร็จ', timer: 1500, showConfirmButton: false });
+            window.closeEditPostModal();
+            fetchMyActivePost();
+        } else { Swal.fire('ล้มเหลว', data.message, 'error'); }
+    } catch (err) { Swal.fire('Error', 'ขัดข้อง', 'error'); }
+    finally {
+        submitBtn.innerHTML = originalContent;
+        submitBtn.disabled = false;
+    }
+}
+
+// --- ฟังก์ชันอื่นๆ ---
+async function fetchMyActivePost() {
+    const container = document.getElementById('my-posts-list');
+    const token = localStorage.getItem('token'); 
+    try {
+        const res = await apiRequest(`${API_BASE}/api/posts/user/${currentUser.UserID}`);
+        const data = await res.json();
+        if(!data.success || !data.results.length) { 
+            container.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs italic">ยังไม่มีประกาศของคุณ</div>'; 
+            return; 
+        }
+        container.innerHTML = data.results.map(post => `
+            <div class="bg-gradient-to-br from-white to-pink-50/30 rounded-2xl p-4 border border-pink-100 shadow-sm mb-2">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] font-bold text-pink-500 uppercase">ประกาศแลกเวร</span>
+                    <div class="flex gap-2">
+                        <button onclick='window.openEditPostModal(${JSON.stringify(post)})' class="text-slate-300 hover:text-yellow-500 transition"><i class="fas fa-edit"></i></button>
+                        <button onclick="window.deletePost('${post.PostID}', '${post.ScheduleID}')" class="text-slate-300 hover:text-red-500 transition"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+                <div class="text-xs font-bold">${moment(post.Nurse_Date).add(543, 'years').format('D MMM YY')} (${post.ShiftName})</div>
+            </div>`).join('');
+    } catch(e) { container.innerHTML = '<div class="text-xs text-red-400">Error</div>'; }
+}
+
+async function openRequestModal(targetId, targetName, scheduleId) {
+    document.getElementById('modal-target-name').innerText = targetName;
+    document.getElementById('modal-target-user-id').value = targetId;
+    document.getElementById('modal-target-schedule-id').value = scheduleId;
+    const select = document.getElementById('my-offer-shift');
+    
+    select.innerHTML = '<option value="" disabled selected>🔄 กำลังตรวจสอบ...</option>';
+    
+    const modal = document.getElementById('requestModal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+    document.getElementById('requestModalContent').classList.replace('scale-90', 'scale-100');
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await apiRequest(`${API_BASE}/api/schedule/my-future-shifts/${currentUser.UserID}?targetScheduleId=${scheduleId}`);
+        const data = await res.json();
+
+        if (data.success && data.results.length > 0) {
+            const safeShifts = data.results.filter(s => {
+                const isBusy = s.SellingStatus === 'Open' || s.TransactionStatus || s.ExchangeStatus === 'pending';
+                return !isBusy; 
+            });
+
+            if (safeShifts.length > 0) {
+                let options = '<option value="">-- เลือกเวรของคุณที่ต้องการแลก --</option>';
+                safeShifts.forEach(s => {
+                    options += `<option value="${s.ScheduleID}">${moment(s.Nurse_Date).add(543, 'years').format('D MMM YY')} - ${s.ShiftName}</option>`;
+                });
+                select.innerHTML = options;
+            } else {
+                select.innerHTML = '<option value="" disabled>ไม่มีเวรที่สามารถแลกได้ในขณะนี้</option>';
+            }
+        } else {
+            select.innerHTML = `<option value="" disabled>ไม่พบข้อมูลเวรของคุณ</option>`;
+        }
+    } catch (err) {
+        select.innerHTML = '<option value="" disabled>เกิดข้อผิดพลาดในการโหลดข้อมูล</option>';
+    }
+}
+
+async function handleSendRequest(e) {
+    e.preventDefault();
+    const myScheduleId = document.getElementById('my-offer-shift').value;
+    if(!myScheduleId) return Swal.fire('กรุณาเลือกเวร', '', 'warning');
+    try {
+        const res = await apiRequest(`${API_BASE}/api/swaps/send-request`, {
+            method: 'POST',
+            body: JSON.stringify({ requesterId: currentUser.UserID, targetUserId: document.getElementById('modal-target-user-id').value, targetScheduleId: document.getElementById('modal-target-schedule-id').value, requesterScheduleId: myScheduleId, reason: document.getElementById('modal-reason').value })
+        });
+        const data = await res.json();
+        if(data.success) { closeRequestModal(); fetchIncomingRequests(); Swal.fire('ส่งคำขอแล้ว!', '', 'success'); }
+    } catch(err) { Swal.fire('Error', '', 'error'); }
+}
+
+async function openPostModal() {
+    const token = localStorage.getItem('token');
+    const select = document.getElementById('post-my-shift');
+    select.innerHTML = '<option value="" disabled selected>🔄 กำลังโหลด...</option>';
+    document.getElementById('postModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('postModal').classList.remove('opacity-0'), 10);
+    document.getElementById('postModalContent').classList.replace('scale-90', 'scale-100');
+    try {
+        const res = await apiRequest(`${API_BASE}/api/schedule/my-future-shifts/${currentUser.UserID}`);
+        const data = await res.json();
+        if (data.success && data.results.length > 0) {
+            let options = '<option value="">-- เลือกเวรที่ปลอดภัยเพื่อประกาศแลก --</option>';
+            data.results.forEach(s => { 
+                const isBusy = s.SellingStatus === 'Open' || s.TransactionStatus || s.ExchangeStatus === 'pending';
+                options += `<option value="${s.ScheduleID}" ${isBusy ? 'disabled' : ''}>${moment(s.Nurse_Date).add(543, 'years').format('D MMM YY')} - ${s.ShiftName}${isBusy ? ' (ติดธุรกรรม)' : ''}</option>`; 
+            });
+            select.innerHTML = options;
+        }
+    } catch (e) { select.innerHTML = '<option value="" disabled>Error</option>'; }
+}
+
+async function handleCreatePost(e) {
+    e.preventDefault();
+    try {
+        const res = await apiRequest(`${API_BASE}/api/posts/create`, {
+            method: 'POST',
+            body: JSON.stringify({ userId: currentUser.UserID, scheduleId: document.getElementById('post-my-shift').value, desiredDate: document.getElementById('post-desired-date').value, note: document.getElementById('post-note').value })
+        });
+        const data = await res.json();
+        if(data.success) { closePostModal(); fetchMyActivePost(); Swal.fire('สำเร็จ', '', 'success'); }
+    } catch (e) { Swal.fire('Error', '', 'error'); }
+}
+
+async function fetchIncomingRequests() {
+    const container = document.getElementById('incoming-list');
+    const badge = document.getElementById('incoming-badge');
+    try {
+        const res = await apiRequest(`${API_BASE}/api/swaps/incoming/${currentUser.UserID}`);
+        const data = await res.json();
+        if(data.success && data.results.length > 0) {
+            badge.innerText = data.results.length; badge.classList.remove('hidden');
+            container.innerHTML = data.results.map(req => `<div class="black-bracket-card p-4 shadow-sm mb-3 bg-white border animate-enter"><div class="flex justify-between items-center mb-2"><div class="text-sm font-bold">${req.RequesterName}</div><div class="flex gap-2"><button onclick="window.respondSwap('${req.SwapID}', 'reject')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl"><i class="fas fa-times"></i></button><button onclick="window.respondSwap('${req.SwapID}', 'approve')" class="w-9 h-9 flex items-center justify-center bg-green-500 text-white rounded-xl"><i class="fas fa-check"></i></button></div></div><div class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg">เอา: ${moment(req.RequesterDate).add(543, 'years').format('D MMM YY')} ↔ แลก: ${moment(req.TargetDate).add(543, 'years').format('D MMM YY')}</div></div>`).join('');
+        } else { badge.classList.add('hidden'); container.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs italic">ไม่มีคำขอ</div>'; }
+    } catch(e) { console.error(e); }
+}
+
+async function respondSwap(id, act) {
+    const confirm = await Swal.fire({ title: 'ยืนยันดำเนินการ?', icon: 'question', showCancelButton: true });
+    if (!confirm.isConfirmed) return;
+    try {
+        const res = await apiRequest(`${API_BASE}/api/swaps/respond`, {
+            method: 'POST',
+            body: JSON.stringify({ swapId: id, action: act, responderId: currentUser.UserID })
+        });
+        const data = await res.json();
+        if(data.success) { fetchIncomingRequests(); Swal.fire('สำเร็จ', '', 'success'); }
+    } catch(e) { Swal.fire('Error', '', 'error'); }
+}
+
+async function fetchPendingApprovals() {
+    const container = document.getElementById('approval-list');
+    const badge = document.getElementById('approval-badge');
+    try {
+        const res = await apiRequest(`${API_BASE}/api/admin/swaps/pending`, { 
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } 
+        });
+        const data = await res.json();
+        if (data.success && data.results.length > 0) {
+            badge.innerText = data.results.length;
+            container.innerHTML = data.results.map(item => `
+                <div class="purple-bracket-card p-4 shadow-sm mb-3 bg-white border animate-enter">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="space-y-1">
+                            <div class="text-[12px] font-bold text-slate-800">
+                                ${item.ReqName} ↔ ${item.ResName}
+                            </div>
+                            
+                            <div class="text-[10px] text-slate-500 flex flex-col gap-0.5">
+                                <div class="flex items-center gap-1">
+                                    <span class="w-12 font-bold text-indigo-600">เวรของ ${item.ReqName}:</span>
+                                    <span>${moment(item.ReqDate).add(543, 'years').format('D MMM YY')} (${item.ReqShift})</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="w-12 font-bold text-purple-600">เวรของ ${item.ResName}:</span>
+                                    <span>${moment(item.ResDate).add(543, 'years').format('D MMM YY')} (${item.ResShift})</span>
+                                </div>
+                            </div>
+
+                            ${item.reason ? `<p class="text-[9px] text-slate-400 mt-1 italic">เหตุผล: ${item.reason}</p>` : ''}
+                        </div>
+                        
+                        <div class="flex gap-2 pt-1">
+                            <button onclick="window.respondApproval('${item.exchange_id}', 'reject')" 
+                                    class="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button onclick="window.respondApproval('${item.exchange_id}', 'approve')" 
+                                    class="w-8 h-8 flex items-center justify-center bg-green-500 text-white rounded-lg shadow-sm hover:bg-green-600 transition">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } else { 
+            container.innerHTML = '<div class="text-center py-10 opacity-40 text-[10px]">ไม่มีรายการค้างอนุมัติ</div>'; 
+            badge.innerText = "0"; 
+        }
+    } catch (err) { console.error("Fetch Pending Error:", err); }
+}
+
+async function respondApproval(id, act) {
+    const confirm = await Swal.fire({ title: 'ยืนยันดำเนินการ?', icon: 'question', showCancelButton: true });
+    if (!confirm.isConfirmed) return;
+    try {
+        const res = await apiRequest(`${API_BASE}/api/admin/swaps/action`, {
+            method: 'POST',
+            body: JSON.stringify({ swapId: id, action: act, adminId: currentUser.UserID })
+        });
+        const data = await res.json();
+        if (data.success) { fetchPendingApprovals(); Swal.fire('สำเร็จ', '', 'success'); }
+    } catch(e) { Swal.fire('Error', '', 'error'); }
+}
+
+async function deletePost(postId, scheduleId) {
+    const confirm = await Swal.fire({ title: 'ลบประกาศ?', icon: 'warning', showCancelButton: true });
+    if (confirm.isConfirmed) {
+        const res = await apiRequest(`${API_BASE}/api/posts/delete/${postId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if(data.success) { fetchMyActivePost(); Swal.fire('สำเร็จ', '', 'success'); }
+    }
+}
+
+function closePostModal() { 
+    const modal = document.getElementById('postModal');
+    modal.classList.add('opacity-0'); 
+    document.getElementById('postModalContent').classList.replace('scale-100', 'scale-90');
+    setTimeout(() => modal.classList.add('hidden'), 300); 
+}
+function closeRequestModal() { 
+    const modal = document.getElementById('requestModal');
+    modal.classList.add('opacity-0'); 
+    document.getElementById('requestModalContent').classList.replace('scale-100', 'scale-90');
+    setTimeout(() => modal.classList.add('hidden'), 300); 
+}
+function closeEditPostModal() { 
+    const modal = document.getElementById('editPostModal');
+    if (modal) {
+        modal.classList.add('opacity-0'); 
+        document.getElementById('editPostModalContent').classList.replace('scale-100', 'scale-90');
+        setTimeout(() => modal.classList.add('hidden'), 300); 
+    }
+}
+function clearEditDate() { 
+    const el = document.getElementById('edit-desired-date');
+    if (el && el._flatpickr) el._flatpickr.clear(); 
+}
+</script>
+</body>
+</html>

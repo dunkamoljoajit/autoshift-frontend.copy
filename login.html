@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTONURSESHIFT - Login</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700&family=Prompt:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="lib/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="lib/sweetalert2.min.css">
+    <style>
+        /* --- การตั้งค่าทั่วไป --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; font-family: 'Kanit', sans-serif; background-color: #f0f2f5; }
+        
+        body {
+            background-image: url('background01.png'); 
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem; 
+        }
+
+        /* --- โลโก้ --- */
+        .logo {
+            position: absolute; top: 30px; left: 40px;
+            font-family: "Prompt", sans-serif; font-weight: 700; color: #222; 
+            display: flex; align-items: center; gap: 8px;
+        }
+        .logo-img { width: 60px; height: 60px; object-fit: contain; }
+        .logo-text { font-size: 1.5rem; font-weight: 600; color: #1e2a78; margin-left: -10px; }
+
+        /* --- ปุ่ม Home --- */
+        .home-button {
+            position: absolute; top: 30px; right: 40px;
+            background-color: #191970; color: white;
+            padding: 10px 20px; border-radius: 50px; text-decoration: none;
+            font-family: 'Kanit', sans-serif; font-weight: 500; font-size: 0.9rem;
+            display: flex; align-items: center; gap: 8px; transition: background-color 0.3s ease;
+        }
+        .home-button:hover { background-color: #2c2c94; }
+
+        /* --- กล่องล็อกอิน --- */
+        .login-box {
+            background: #ffffff; padding: 3rem; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+            width: 450px; max-width: 100%; text-align: center;
+        }
+        .login-box h2 {
+            color: #191970; font-size: 2.8rem; font-weight: 700; margin-bottom: 2.5rem;
+        }
+
+        /* --- Form --- */
+        .input-group { position: relative; margin-bottom: 1.5rem; }
+        .input-group input {
+            width: 100%; padding: 18px 25px 18px 60px; 
+            border: 1px solid #eee; background: #fff; border-radius: 50px; 
+            font-size: 1rem; font-family: 'Kanit', sans-serif; outline: none; transition: border 0.3s;
+        }
+        .input-group input:focus { border-color: #191970; }
+        .input-group input#password { padding-right: 60px; }
+        
+        .input-group .icon-left {
+            position: absolute; left: 25px; top: 50%; transform: translateY(-50%);
+            color: #888; font-size: 1.1rem;
+        }
+        .input-group .icon-right-toggle {
+            position: absolute; right: 25px; top: 50%; transform: translateY(-50%);
+            color: #aaa; cursor: pointer; transition: color 0.3s ease;
+        }
+        .input-group .icon-right-toggle:hover { color: #555; }
+
+        .forgot-password {
+            text-align: right; margin-top: -10px; margin-bottom: 2rem;
+            font-size: 0.9rem; color: #777; text-decoration: none; display: block;
+        }
+        .forgot-password:hover { text-decoration: underline; color: #191970; }
+
+        /* --- ปุ่ม Login --- */
+        .login-button {
+            background-color: #191970; color: white; border: none;
+            padding: 16px; border-radius: 50px; font-size: 1.2rem;
+            font-weight: 500; font-family: 'Kanit', sans-serif; cursor: pointer;
+            transition: all 0.3s ease; margin-bottom: 1rem; width: 100%;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+        }
+        .login-button:hover { background-color: #2c2c94; transform: translateY(-2px); }
+        .login-button:disabled { background-color: #ccc; cursor: not-allowed; transform: none; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .logo { top: 20px; left: 20px; }
+            .logo-text { font-size: 1.0rem; }
+            .logo-img { width: 50px; height: 50px; }
+            .home-button { top: 19px; right: 20px; padding: 8px 15px; font-size: 0.8rem; }
+        }
+        @media (max-width: 480px) {
+            .login-box { padding: 2rem; margin-top:15px; }
+            .login-box h2 { font-size: 2.2rem; margin-bottom: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="logo">
+      <img src="logo.png" alt="logo" class="logo-img">
+      <span class="logo-text">AUTONURSESHIFT</span>
+    </div>
+
+    <a href="index.html" class="home-button">
+        <i class="fas fa-home"></i>&nbsp;Home
+    </a>
+
+    <div class="login-box">
+        <h2>เข้าสู่ระบบ</h2>
+        <form id="loginForm" class="login-form">
+            
+            <div class="input-group">
+                <i class="fas fa-envelope icon-left"></i>
+                <input type="email" placeholder="E-mail" id="email" required>
+            </div>
+            
+            <div class="input-group">
+                <i class="fas fa-lock icon-left"></i>
+                <input type="password" placeholder="รหัสผ่าน" id="password" required>
+                <i class="fas fa-eye icon-right-toggle" id="togglePassword"></i>
+            </div>
+            
+            <a href="otp.html" class="forgot-password">ลืมรหัสผ่าน?</a>
+            
+            <button type="submit" class="login-button" id="loginBtn">
+                <span>เข้าสู่ระบบ</span>
+            </button>
+        </form>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // กำหนด URL ของ API ไว้ที่เดียว แก้ไขง่าย
+        const API_BASE_URL = 'https://autoshift-backend.onrender.com';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('loginForm');
+            const emailInput = document.getElementById('email'); 
+            const passwordInput = document.getElementById('password');
+            const loginBtn = document.getElementById('loginBtn'); 
+            const togglePassword = document.getElementById('togglePassword');
+            
+            // Toggle Password
+            if (togglePassword) {
+                togglePassword.addEventListener('click', () => {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    togglePassword.classList.toggle('fa-eye');
+                    togglePassword.classList.toggle('fa-eye-slash');
+                });
+            }
+
+            // Handle Submit
+            loginForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const Email = emailInput.value.trim();
+                const Password = passwordInput.value;
+
+                if (!Email || !Password) {
+                    Swal.fire({ icon: 'warning', title: 'แจ้งเตือน', text: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+                    return;
+                }
+
+                // Loading State (เปลี่ยนปุ่มเป็นหมุนๆ)
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> กำลังตรวจสอบ...';
+
+                try {
+                    const response = await fetch(`https://autoshift-backend.onrender.com/api/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ Email, Password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const user = data.user;
+
+                        // บันทึก Token และข้อมูลพื้นฐาน
+                        if (data.token) localStorage.setItem('token', data.token);
+                        
+                        localStorage.setItem('user', JSON.stringify(user));
+                        localStorage.setItem('userId', user.UserID);      
+                        localStorage.setItem('userName', user.FirstName);
+                        localStorage.setItem('userRole', user.RoleID);
+
+                        // ✅ [แก้ไขส่วนนี้] ตรวจสอบ MustChangePassword
+                        if (user.MustChangePassword === 1) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: '⚠️ เปลี่ยนรหัสผ่านครั้งแรก',
+                                text: 'เพื่อความปลอดภัย ระบบบังคับให้คุณเปลี่ยนรหัสผ่านใหม่ก่อนเข้าใช้งาน',
+                                confirmButtonText: 'ตั้งรหัสผ่านใหม่',
+                                confirmButtonColor: '#191970',
+                                allowOutsideClick: false,
+                                allowEscapeKey: false
+                            }).then(() => {
+                                // พาไปหน้าเปลี่ยนรหัสผ่าน (ที่เราจะสร้างในขั้นตอนที่ 2)
+                                window.location.href = 'change_password_first.html'; 
+                            });
+                            return; // หยุดการทำงาน ไม่ให้ redirect ไป dashboard
+                        }
+                        // --------------------------------------------------
+
+                        // Login สำเร็จแบบปกติ (คนเก่า หรือคนที่เปลี่ยนรหัสแล้ว)
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'เข้าสู่ระบบสำเร็จ',
+                            text: 'กำลังพาคุณเข้าสู่ระบบ...',
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => {
+                            if (user.RoleID === 1) {
+                                window.location.href = 'Headnurse_dashboard.html'; 
+                            } else if (user.RoleID === 2) {
+                                window.location.href = 'dashboard.html'; 
+                            } else if (user.RoleID === 3) {
+                            // ✅ เพิ่มตรงนี้: สำหรับ AEMT
+                            window.location.href = 'AEMT.html';
+                            } else {
+                                Swal.fire('Error', 'ไม่มีสิทธิ์เข้าถึง', 'error');
+                            }
+                        });
+                    
+                    } else {
+                        // Login ไม่ผ่าน
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เข้าสู่ระบบไม่สำเร็จ',
+                            text: data.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+                        });
+                    }
+                } catch (err) {
+                    console.error('Fetch error', err);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'ข้อผิดพลาด',
+                        text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'
+                    });
+                } finally {
+                    // Reset ปุ่มกลับเหมือนเดิม
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = '<span>เข้าสู่ระบบ</span>';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
